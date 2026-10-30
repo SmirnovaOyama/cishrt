@@ -1,0 +1,72 @@
+# The cis women's edition (src/edition.ts), deployed to cishrt.mahiro.uk:
+# the same Worker, serving the `--mode cis` build, with a database, avatar
+# bucket and rate-limit namespaces of its own, so its accounts and the trans
+# edition's never meet.
+#
+#   npm run wrangler:migrate:cis   # after pulling new migrations
+#   npm run deploy:cis             # build into dist-cis and deploy
+#
+# Secrets are this Worker's own: `wrangler secret put JWT_SECRET -c wrangler.cis.toml`.
+name = "cishrt-tracker"
+main = "worker.ts"
+compatibility_date = "2025-12-04"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [{ pattern = "cishrt.mahiro.uk", custom_domain = true }]
+
+# Built into its own folder, never ./dist: a stale trans build there must not
+# be what this Worker serves.
+[build]
+command = "test -d dist-cis || npm run build:cis"
+
+[assets]
+directory = "./dist-cis"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/*", "!/assets/*"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[vars]
+PUBLIC_APP_ORIGIN = "https://cishrt.mahiro.uk"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cishrt-tracker-prod"
+database_id = "acd4f500-8852-474d-b031-19fc786abc36"
+
+[[r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "cishrt-avatars"
+
+[triggers]
+crons = ["17 */6 * * *"]
+
+# Namespaces apart from hrt-tracker's (10xx) and its previews' (20xx), so the
+# two sites never count against each other's limits.
+[[ratelimits]]
+name = "RL_PER_MINUTE_10"
+namespace_id = "3010"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "RL_PER_MINUTE_20"
+namespace_id = "3020"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "RL_PER_MINUTE_30"
+namespace_id = "3030"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "RL_PER_MINUTE_60"
+namespace_id = "3060"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "RL_PER_MINUTE_300"
+namespace_id = "3300"
+simple = { limit = 300, period = 60 }

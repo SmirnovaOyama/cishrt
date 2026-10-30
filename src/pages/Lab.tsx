@@ -29,6 +29,9 @@ import { AddCancelLabel, SwapLabel } from '../components/StableLabel';
 import { CopyTick } from '../components/Tick';
 import { scrollParent } from '../utils/scrollParent';
 import { inertWhen } from '../utils/inert';
+import { IS_CIS } from '../edition';
+import HealthChecks from '../components/HealthChecks';
+import { HealthCheck } from '../utils/healthCheck';
 
 interface LabProps {
     t: (key: string) => string;
@@ -41,6 +44,10 @@ interface LabProps {
     onSaveLabResult: (res: LabResult) => void;
     onDeleteLabResult: (id: string) => void;
     onClearLabResults: () => void;
+    /** Health checks, which the cis edition shows first; see utils/healthCheck. */
+    healthChecks: HealthCheck[];
+    onSaveHealthCheck: (check: HealthCheck) => void;
+    onDeleteHealthCheck: (id: string) => void;
     calibrationMethod: CalibrationMethod;
     calibration: CalibrationResult;
     onOpenCalibrationSettings: () => void;
@@ -57,6 +64,9 @@ const Lab: React.FC<LabProps> = ({
     onSaveLabResult,
     onDeleteLabResult,
     onClearLabResults,
+    healthChecks,
+    onSaveHealthCheck,
+    onDeleteHealthCheck,
     calibrationMethod,
     calibration,
     onOpenCalibrationSettings,
@@ -175,6 +185,19 @@ const Lab: React.FC<LabProps> = ({
             </div>
 
             <div className={PAGE_COLUMN}>
+                {/* The cis edition starts from the health check: it is what the
+                    estimate stands on, before any blood test calibrates it. */}
+                {IS_CIS && (
+                    <HealthChecks
+                        checks={healthChecks}
+                        events={events}
+                        labResults={labResults}
+                        onSave={onSaveHealthCheck}
+                        onDelete={onDeleteHealthCheck}
+                        onAddLab={onSaveLabResult}
+                    />
+                )}
+                {IS_CIS && <h2 className="group-heading mb-1">{t('lab.section_title')}</h2>}
                 {hormoneAdvisory && (
                     <div className="pb-4">
                         <HormoneLevelAdvisoryLine advisory={hormoneAdvisory} t={t} />
@@ -208,8 +231,9 @@ const Lab: React.FC<LabProps> = ({
                             </p>
                         )}
                         {/* Adding a result is the one thing this page is waiting
-                            for. Gone while the form is open above. */}
-                        {!isQuickAddLabOpen && (
+                            for. Gone while the form is open above, and in the cis
+                            edition until there is a health check, which comes first. */}
+                        {!isQuickAddLabOpen && (!IS_CIS || healthChecks.length > 0) && (
                             <button onClick={() => setIsQuickAddLabOpen(true)} className="btn-primary mt-6">
                                 {t('lab.add_title')}
                             </button>
@@ -237,8 +261,14 @@ const Lab: React.FC<LabProps> = ({
                                 // testosterone, which nothing calibrates, against the
                                 // model directly, so a transmasc lab reads the same way.
                                 const tModel = isT ? rawModelAtLab(simulation, res) : null;
+                                // With the person's own estradiol known, the lab and the
+                                // model are both read as levels, that included.
+                                const own = pt?.endo ?? 0;
                                 const cmp = pt
-                                    ? { pred: pt.pred, pct: Math.round((pt.ratio - 1) * 100) }
+                                    ? {
+                                          pred: pt.pred + own,
+                                          pct: Math.round(((pt.obs + own) / (pt.pred + own) - 1) * 100),
+                                      }
                                     : tModel != null
                                       ? { pred: tModel, pct: labVsModelPct(labInModelUnit(res), tModel) }
                                       : null;

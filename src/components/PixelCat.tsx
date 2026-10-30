@@ -2,7 +2,8 @@ import React from 'react';
 import { usePixelCats, CatStyle, CatState } from '../contexts/PixelCatContext';
 
 // Pixel cats for empty states, drawn on a 26×15 grid. Horizontal bands echo the
-// trans pride flag (blue · pink · white · pink · blue).
+// trans pride flag (blue · pink · white · pink · blue); the cis edition's cat
+// is one grey coat instead (see CatStyle).
 //
 // Legend: # fur   d ear inner   E eye   N nose   p paw
 //         T tail  t tail edge   . transparent
@@ -684,11 +685,12 @@ const POSES: Record<CatPose, Pose> = {
 const GRID_W = 26;
 const GRID_H = 15;
 
-type Band = 'blue' | 'pink' | 'white';
+type Band = 'blue' | 'pink' | 'white' | 'grey';
 
 // 'flag' stripes the sprite; the solid styles keep the same three-tone
 // fill/shade/edge structure, so the tail and paws still read.
 function bandAt(y: number, style: CatStyle): Band {
+    if (style === 'grey') return 'grey';
     if (style === 'blue') return 'blue';
     if (style === 'pink') return 'pink';
     if (y <= 3) return 'blue';
@@ -702,18 +704,21 @@ const BAND_FILL: Record<Band, string> = {
     blue: 'var(--pixel-blue)',
     pink: 'var(--pixel-pink)',
     white: 'var(--pixel-white)',
+    grey: 'var(--pixel-grey)',
 };
 
 const BAND_SHADE: Record<Band, string> = {
     blue: 'var(--pixel-blue-shade)',
     pink: 'var(--pixel-pink-shade)',
     white: 'var(--pixel-white-shade)',
+    grey: 'var(--pixel-grey-shade)',
 };
 
 const BAND_EDGE: Record<Band, string> = {
     blue: 'var(--pixel-blue-edge)',
     pink: 'var(--pixel-pink-edge)',
     white: 'var(--pixel-white-edge)',
+    grey: 'var(--pixel-grey-edge)',
 };
 
 // Silhouette pixels get the edge colour; without it the white band dissolves

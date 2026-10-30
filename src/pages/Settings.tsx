@@ -5,6 +5,7 @@ import { AppTheme } from '../constants';
 import { DoseEvent, PKCustomParams } from '../../logic';
 import { useHRTMode } from '../contexts/HRTModeContext';
 import { usePixelCats, CatStyle } from '../contexts/PixelCatContext';
+import { IS_CIS } from '../edition';
 import Switch from '../components/Switch';
 import { settingsSection, rowBleed } from '../components/SettingsListItem';
 import PageHeader, { PAGE_COLUMN } from '../components/PageHeader';
@@ -108,15 +109,18 @@ const SwitchRow: React.FC<{ label: string; desc: string; checked: boolean; onCha
 
 // Hard stops rather than a smooth blend, in equal fifths — the flag's stripes
 // are even, and anything else reads as a lopsided swatch.
-const CAT_STYLE_SWATCHES: { id: CatStyle; background: string }[] = [
-    {
-        id: 'flag',
-        background:
-            'linear-gradient(180deg, var(--pixel-blue) 0 20%, var(--pixel-pink) 20% 40%, var(--pixel-white) 40% 60%, var(--pixel-pink) 60% 80%, var(--pixel-blue) 80% 100%)',
-    },
-    { id: 'blue', background: 'var(--pixel-blue)' },
-    { id: 'pink', background: 'var(--pixel-pink)' },
-];
+// The cis edition's cat has one coat, so it has no swatches to choose from.
+const CAT_STYLE_SWATCHES: { id: CatStyle; background: string }[] = IS_CIS
+    ? []
+    : [
+          {
+              id: 'flag',
+              background:
+                  'linear-gradient(180deg, var(--pixel-blue) 0 20%, var(--pixel-pink) 20% 40%, var(--pixel-white) 40% 60%, var(--pixel-pink) 60% 80%, var(--pixel-blue) 80% 100%)',
+          },
+          { id: 'blue', background: 'var(--pixel-blue)' },
+          { id: 'pink', background: 'var(--pixel-pink)' },
+      ];
 
 const CAT_ORDER: readonly SettingsCat[] = ['general', 'data', 'about'];
 const MOBILE_ORDER: readonly MobileView[] = ['list', ...CAT_ORDER];
@@ -261,11 +265,14 @@ const Settings: React.FC<SettingsProps> = ({
             {/* What the model is fed. */}
             <SectionHeading title={t('settings.section.model')} />
             <div className={section}>
-                <NavRow
-                    label={t('settings.hrt_mode')}
-                    value={t(mode === 'transfem' ? 'mode.transfem' : 'mode.transmasc')}
-                    onClick={() => navTo(onNavigateToHRTMode, 'general')}
-                />
+                {/* The cis edition follows estradiol only, so there is nothing to switch. */}
+                {!IS_CIS && (
+                    <NavRow
+                        label={t('settings.hrt_mode')}
+                        value={t(mode === 'transfem' ? 'mode.transfem' : 'mode.transmasc')}
+                        onClick={() => navTo(onNavigateToHRTMode, 'general')}
+                    />
+                )}
                 <NavRow
                     label={t('status.weight')}
                     value={`${weight} kg`}
@@ -333,8 +340,9 @@ const Settings: React.FC<SettingsProps> = ({
                     checked={showCats}
                     onChange={setShowCats}
                 />
-                {/* Only worth showing once the cats themselves are on. */}
-                {showCats && (
+                {/* Only worth showing once the cats themselves are on, and not in
+                    the cis edition, whose cat has one coat of its own. */}
+                {showCats && CAT_STYLE_SWATCHES.length > 1 && (
                     <div className={`${rowBase} cursor-default`}>
                         <span className={rowLabel}>{t('settings.cat_style')}</span>
                         <div className="flex items-center gap-2.5">

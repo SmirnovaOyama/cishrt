@@ -6,6 +6,7 @@ import {
     SimulationResult,
     LabResult,
     getDoseAdvisory,
+    DOSE_CEILING_MHT,
     getHormoneLevelAdvisory,
     isT_LabUnit,
     CPA_MIN_NGML,
@@ -21,6 +22,8 @@ import CommunityVotePrompt from '../components/CommunityVotePrompt';
 import Doodle from '../components/Doodle';
 import Tick from '../components/Tick';
 import { useHRTMode } from '../contexts/HRTModeContext';
+import { IS_CIS } from '../edition';
+import { PREMENOPAUSAL_E2 } from '../utils/femaleRanges';
 import { usePixelCats } from '../contexts/PixelCatContext';
 import { useDialog } from '../contexts/DialogContext';
 import { AppTheme } from '../constants';
@@ -118,7 +121,10 @@ const Home: React.FC<HomeProps> = ({
 
     // Warn on how much medication was actually logged (a hard fact), and nudge
     // toward calibration when there's no lab yet to anchor the estimate.
-    const doseAdvisory = React.useMemo(() => getDoseAdvisory(events), [events]);
+    const doseAdvisory = React.useMemo(
+        () => getDoseAdvisory(events, undefined, IS_CIS ? DOSE_CEILING_MHT : undefined),
+        [events],
+    );
 
     // A supply nothing current uses never runs low.
     const lowSupplies = React.useMemo(
@@ -210,8 +216,10 @@ const Home: React.FC<HomeProps> = ({
               value: currentLevel,
               decimals: 1,
               unit: 'pg/mL',
-              band: { low: 100, high: 200 },
-              domain: [10, 1000] as [number, number],
+              // The cis edition reads against the premenopausal range, and
+              // after menopause levels sit under 10, so its rail reaches lower.
+              band: IS_CIS ? PREMENOPAUSAL_E2 : { low: 100, high: 200 },
+              domain: (IS_CIS ? [2, 1000] : [10, 1000]) as [number, number],
           };
 
     // The second reading, flush right at the same size as the first: for
@@ -295,6 +303,7 @@ const Home: React.FC<HomeProps> = ({
                                             <div className="disclosure-inner">
                                                 <div className="pb-5 space-y-3 text-sm leading-relaxed text-[var(--text-muted)] max-w-prose">
                                                     <p>{t('modal.estimate.p1')}</p>
+                                                    {IS_CIS && <p>{t('modal.estimate.cis_own')}</p>}
                                                     <p className="callout text-[var(--text)] font-medium">
                                                         {t('modal.estimate.p2')}
                                                     </p>

@@ -4,6 +4,7 @@ import { Undo, ChevronDown, Warning, Info, Check } from '../components/icons';
 import { useTranslation } from '../contexts/LanguageContext';
 import { useDialog } from '../contexts/DialogContext';
 import { PKCustomParams, DEFAULT_PK_PARAMS } from '../../logic';
+import { IS_CIS } from '../edition';
 
 interface PKParamsPageProps {
     pkParams: PKCustomParams | null;
@@ -88,6 +89,15 @@ const SECTIONS: { key: SectionKey; titleKey: string; fields: FieldDef[] }[] = [
 const divider = 'border-b-(length:--hairline) border-[var(--border)]';
 
 const FIELDS = SECTIONS.flatMap(s => s.fields);
+
+// What the page lists. The cis edition has no testosterone and no scrotal
+// gel, so their parameters aren't shown; they keep their values all the same.
+const SHOWN_SECTIONS = IS_CIS
+    ? SECTIONS.filter(s => !s.key.startsWith('t_')).map(s => ({
+          ...s,
+          fields: s.fields.filter(f => !f.key.includes('scrotal')),
+      }))
+    : SECTIONS;
 const clampTo = (f: FieldDef, n: number) => Math.max(f.min, Math.min(f.max, n));
 
 const PKParamsPage: React.FC<PKParamsPageProps> = ({ pkParams, onSave, onReset, onBack }) => {
@@ -201,7 +211,7 @@ const PKParamsPage: React.FC<PKParamsPageProps> = ({ pkParams, onSave, onReset, 
                 </div>
 
                 {/* Sections — flat, no cards */}
-                {SECTIONS.map(section => (
+                {SHOWN_SECTIONS.map(section => (
                     <div key={section.key}>
                         <button
                             onClick={() => toggleSection(section.key)}

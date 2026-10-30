@@ -9,6 +9,7 @@ import {
     LabResult,
     HRTMode,
     interpolateConcentration_E2,
+    endogenousE2,
     interpolateConcentration_CPA,
     interpolateConcentration_T,
     convertToPgMl,
@@ -20,6 +21,8 @@ import {
     isUnmodelledDrug,
 } from '../../logic';
 import { useHRTMode } from '../contexts/HRTModeContext';
+import { IS_CIS } from '../edition';
+import { PREMENOPAUSAL_E2 } from '../utils/femaleRanges';
 import { useElementSize } from '../hooks/useElementSize';
 import Segmented from './Segmented';
 
@@ -363,10 +366,12 @@ const ResultChart = ({
     // Typical target band, matching the reference ranges the app uses for its
     // status labels (see useAppData currentStatus): transmasc total-T sits in
     // the ~300–1000 ng/dL male range; transfem E2 in the ~100–200 pg/mL band.
-    // Cyproterone has no target range, so it gets none.
+    // Cyproterone has no target range, so it gets none. The cis edition shades
+    // the premenopausal range instead, to compare with (see femaleRanges).
     const primaryTarget = useMemo<{ low: number; high: number } | null>(() => {
         if (isTransmasc) return { low: 300, high: 1000 };
         if (primaryIsCPA) return null;
+        if (IS_CIS) return PREMENOPAUSAL_E2;
         return { low: 100, high: 200 };
     }, [isTransmasc, primaryIsCPA]);
 
@@ -400,7 +405,12 @@ const ResultChart = ({
             if (isTransmasc) return { t: time, p: src.concNGdL_T?.[i] ?? 0, s: null, f };
             const cpa = src.concPGmL_CPA[i] ?? 0;
             if (primaryIsCPA) return { t: time, p: cpa, s: null, f };
-            return { t: time, p: src.concPGmL_E2[i] * calibrationFn(h), s: hasSecondary ? cpa : null, f };
+            return {
+                t: time,
+                p: src.concPGmL_E2[i] * calibrationFn(h) + endogenousE2(src),
+                s: hasSecondary ? cpa : null,
+                f,
+            };
         };
         const out: Pt[] = [];
         for (let i = 0; i < sim.timeH.length; i++) {
@@ -505,7 +515,7 @@ const ResultChart = ({
                     axis = hasSecondary ? 's' : 'p';
                 } else {
                     const v = interpolateConcentration_E2(sim, e.timeH);
-                    value = v == null ? null : v * calibrationFn(e.timeH);
+                    value = v == null ? null : v * calibrationFn(e.timeH) + endogenousE2(sim);
                     axis = 'p';
                 }
                 const v = value != null && Number.isFinite(value) ? value : 0;
@@ -754,7 +764,7 @@ const ResultChart = ({
             ? interpolateConcentration_T(sim, h)
             : (() => {
                   const e = interpolateConcentration_E2(sim, h);
-                  return e == null ? null : e * calibrationFn(h);
+                  return e == null ? null : e * calibrationFn(h) + endogenousE2(sim);
               })();
         return v != null && Number.isFinite(v) ? v : null;
     }, [sim, now, isTransmasc, primaryIsCPA, calibrationFn]);
@@ -918,7 +928,7 @@ const ResultChart = ({
         if (!best) return null;
         const h = best.t / HOUR;
         const m = isTransmasc ? interpolateConcentration_T(sim, h) : interpolateConcentration_E2(sim, h);
-        const model = m != null && Number.isFinite(m) && m >= 1 ? m : null;
+        const model = m != null && Number.isFinite(m) && m >= 1 ? m + (isTransmasc ? 0 : endogenousE2(sim)) : null;
         return { ...best, model, pct: model != null ? labVsModelPct(best.v, model) : null };
     })();
 

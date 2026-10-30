@@ -5,7 +5,7 @@ import { HRTModeProvider, useHRTMode } from './contexts/HRTModeContext';
 import { PixelCatProvider } from './contexts/PixelCatContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppTheme } from './constants';
-import { DoseEvent, decompressData, encryptData, decryptData } from '../logic';
+import { DoseEvent, decompressData, encryptData, decryptData, endogenousE2 } from '../logic';
 import { v4 as uuidv4 } from 'uuid';
 import { PlanItem, planEvent } from './utils/plan';
 import Plan from './pages/Plan';
@@ -126,6 +126,9 @@ const AppContent = () => {
         plan,
         savePlanItem,
         deletePlanItem,
+        healthChecks,
+        saveHealthCheck,
+        deleteHealthCheck,
         currentT,
         currentStatus,
         simulationAhead,
@@ -877,6 +880,8 @@ const AppContent = () => {
                 plan={plan}
                 onAddPlanItem={savePlanItem}
                 onDeletePlanItem={deletePlanItem}
+                healthChecks={healthChecks}
+                onSaveHealthCheck={saveHealthCheck}
                 onDone={() => {
                     markOnboardingSeen();
                     setShowOnboarding(false);
@@ -974,6 +979,7 @@ const AppContent = () => {
                             weight={weight}
                             birthYear={modelBirthYear}
                             labResults={labResults}
+                            ownE2PGmL={endogenousE2(simulation)}
                             calibration={calibration}
                             calibrationMethod={calibrationMethod}
                             calibrationHistoryMode={calibrationHistoryMode}
@@ -1034,6 +1040,9 @@ const AppContent = () => {
                             }}
                             onDeleteLabResult={deleteLabResult}
                             onClearLabResults={clearLabResults}
+                            healthChecks={healthChecks}
+                            onSaveHealthCheck={saveHealthCheck}
+                            onDeleteHealthCheck={deleteHealthCheck}
                             calibrationMethod={calibrationMethod}
                             calibration={calibration}
                             onOpenCalibrationSettings={() => handleViewChange('lab-calibration')}

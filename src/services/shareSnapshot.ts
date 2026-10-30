@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { DoseEvent, HRTMode, SimulationResult } from '../../logic';
+import { DoseEvent, HRTMode, SimulationResult, endogenousE2 } from '../../logic';
 import { SharedDosageSnapshot } from './sharing';
 
 const MAX_SHARED_SIMULATION_POINTS = 2500;
@@ -70,9 +70,12 @@ export const buildSharedDosageSnapshot = ({
     if (simulation && events.length > 0) {
         const indexes = sampleIndexes(simulation.timeH, events);
         // Preserve the sender's calibrated curve without disclosing the lab
-        // values or weight used to calibrate it.
+        // values or weight used to calibrate it. The person's own estradiol
+        // goes in as part of each level, so the viewer sees what the sender
+        // does without being told the health check behind it.
+        const own = endogenousE2(simulation);
         const calibratedE2 = indexes.map(
-            sourceIndex => simulation.concPGmL_E2[sourceIndex] * calibrationFn(simulation.timeH[sourceIndex]),
+            sourceIndex => simulation.concPGmL_E2[sourceIndex] * calibrationFn(simulation.timeH[sourceIndex]) + own,
         );
         sharedSimulation = {
             timeH: indexes.map(index => simulation.timeH[index]),

@@ -139,6 +139,20 @@ export interface SimulationResult {
     // adds CPA converted to pg/mL, a different drug in a unit a thousand times
     // larger, which would swamp it.
     auc: number;
+    // The person's own estradiol (pg/mL), when known: see endogenousE2.
+    endogenousE2PGmL?: number;
+}
+
+/**
+ * The estradiol the person makes themself (pg/mL) that a run was given, or 0.
+ * In the cis edition it is what a health check measured before HRT (see
+ * src/utils/healthCheck). It is not in the curves, which are the doses' alone:
+ * every level read off them adds it after calibration, since calibration
+ * corrects how the doses are absorbed and cleared, not what the ovaries make.
+ */
+export function endogenousE2(sim: SimulationResult | null | undefined): number {
+    const v = sim?.endogenousE2PGmL;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
 }
 
 // --- Lab Results & Calibration ---
@@ -222,6 +236,22 @@ const DOSE_CEILING = {
     tInjPerWeek: 200, // mg/week — injected testosterone (50–100 mg/wk is typical)
 } as const;
 
+export type DoseCeilings = { readonly [K in keyof typeof DOSE_CEILING]: number };
+
+// Menopause HRT takes far smaller estradiol doses than feminizing HRT, so the
+// cis edition checks against ceilings of its own, again 1.5× the top of the
+// usual range: the British Menopause Society's dose bands end at "high" with
+// 4 mg/day oral, a 100 µg/day patch and 3 mg/day of gel (four 0.75 mg pumps).
+// Sublingual isn't a menopause route, so it is held to the oral ceiling.
+// Injections, and everything that isn't estradiol, keep the ceilings above.
+export const DOSE_CEILING_MHT: DoseCeilings = {
+    ...DOSE_CEILING,
+    e2OralPerDay: 6,
+    e2SublingualPerDay: 6,
+    e2GelPerDay: 4.5,
+    e2PatchPerDay: 0.15,
+};
+
 // Injections closer together than this are one dose split across sites.
 const SPLIT_INJECTION_H = 12;
 // How long a patch with neither a removal nor a planned wear time is assumed
@@ -272,18 +302,18 @@ function _localDayStartH(day: number): number {
  * reservoir is several times what it releases) and is left out, as the
  * per-dose guide in the dose form does.
  */
-function _e2DailyRatio(events: DoseEvent[], nowH: number, days: number): number {
+function _e2DailyRatio(events: DoseEvent[], nowH: number, days: number, ceilings: DoseCeilings): number {
     const inWindow = (t: number) => nowH - t >= 0 && nowH - t <= days * 24;
     const byDay = new Map<number, number>();
     for (const e of events) {
         if (!isEstradiolEster(e.ester) || !inWindow(e.timeH)) continue;
         const ceiling =
             e.route === Route.oral
-                ? DOSE_CEILING.e2OralPerDay
+                ? ceilings.e2OralPerDay
                 : e.route === Route.sublingual
-                  ? DOSE_CEILING.e2SublingualPerDay
+                  ? ceilings.e2SublingualPerDay
                   : e.route === Route.gel
-                    ? DOSE_CEILING.e2GelPerDay
+                    ? ceilings.e2GelPerDay
                     : null;
         if (ceiling === null) continue;
         const day = _localDay(e.timeH);
@@ -323,14 +353,13 @@ function _e2DailyRatio(events: DoseEvent[], nowH: number, days: number): number 
     // switch from tablets in the morning to a patch at night is two half days,
     // not one full day of each.
     for (const [day, ratio] of byDay) {
-        const total =
-            ratio + patchMgPerDay(_localDayStartH(day), _localDayStartH(day + 1)) / DOSE_CEILING.e2PatchPerDay;
+        const total = ratio + patchMgPerDay(_localDayStartH(day), _localDayStartH(day + 1)) / ceilings.e2PatchPerDay;
         if (total > mx) mx = total;
     }
     // Each application, where the patch total rises.
     for (const p of patches) {
         if (!inWindow(p.start)) continue;
-        const ratio = patchMgPerDay(p.start, p.start + 24) / DOSE_CEILING.e2PatchPerDay;
+        const ratio = patchMgPerDay(p.start, p.start + 24) / ceilings.e2PatchPerDay;
         if (ratio > mx) mx = ratio;
     }
     return mx;
@@ -488,10 +517,12 @@ function _injectionWeeklyRate(events: DoseEvent[], nowH: number, pred: (e: DoseE
 /**
  * A gentle, non-diagnostic heads-up when the *logged doses* run clearly above the
  * usual range. Returns the single most-exceeded family, or null. Not medical advice.
+ * `ceilings`: DOSE_CEILING for feminizing and masculinizing HRT, DOSE_CEILING_MHT for menopause HRT.
  */
 export function getDoseAdvisory(
     events: DoseEvent[],
     nowH: number = Date.now() / (1000 * 60 * 60),
+    ceilings: DoseCeilings = DOSE_CEILING,
 ): DoseAdvisory | null {
     if (!events.length) return null;
 
@@ -503,7 +534,7 @@ export function getDoseAdvisory(
     // patches can't be logged from the app (see DoseForm), so only gel counts
     // for T.
     const cpaPerDay = _cpaPerDay(events, nowH, 14);
-    const e2DailyRatio = _e2DailyRatio(events, nowH, 14);
+    const e2DailyRatio = _e2DailyRatio(events, nowH, 14, ceilings);
     const tGelPerDay = _maxDailyDose(events, nowH, 14, e => isT(e) && e.route === Route.gel);
 
     // Injected families: cadence-inferred weekly rate, plus a single-dose guard for E2.
@@ -514,9 +545,9 @@ export function getDoseAdvisory(
         if (m.doseMG > e2InjSingle) e2InjSingle = m.doseMG;
     }
 
-    const cpaRatio = cpaPerDay / DOSE_CEILING.cpaPerDay;
-    const e2Ratio = Math.max(e2DailyRatio, e2InjWk / DOSE_CEILING.e2InjPerWeek, e2InjSingle / DOSE_CEILING.e2InjSingle);
-    const tRatio = Math.max(tGelPerDay / DOSE_CEILING.tGelPerDay, tInjWk / DOSE_CEILING.tInjPerWeek);
+    const cpaRatio = cpaPerDay / ceilings.cpaPerDay;
+    const e2Ratio = Math.max(e2DailyRatio, e2InjWk / ceilings.e2InjPerWeek, e2InjSingle / ceilings.e2InjSingle);
+    const tRatio = Math.max(tGelPerDay / ceilings.tGelPerDay, tInjWk / ceilings.tInjPerWeek);
 
     // Both estrogen and antiandrogen running high at once is a real combination
     // (they're routinely dosed together in transfem regimens) and each carries
@@ -631,9 +662,12 @@ export function normalizeCalibrationMethod(raw: string | null | undefined): Cali
 export interface CalibrationPoint {
     id: string;
     timeH: number;
-    obs: number; // measured E2, converted to pg/mL
+    obs: number; // measured E2, converted to pg/mL, less the person's own (endo)
     pred: number; // raw model-predicted E2 at the lab time (pg/mL)
     ratio: number; // obs / pred (how far the body runs above/below the model)
+    // The person's own estradiol taken off obs (pg/mL; see endogenousE2). Add
+    // it back to obs and pred to show them as levels. Absent means none.
+    endo?: number;
 }
 
 const clampRatio = (r: number) => Math.max(0.01, Math.min(100, r));
@@ -644,9 +678,15 @@ const clampRatio = (r: number) => Math.max(0.01, Math.min(100, r));
  * Testosterone-unit labs and points where the model predicts ~0 are excluded
  * (a near-zero prediction means the lab doesn't correspond to the simulated PK
  * state — e.g. a baseline draw before any dose — and would yield an absurd ratio).
+ *
+ * With the person's own estradiol known (endogenousE2), a lab is that plus the
+ * doses' share, and only the doses' share is compared: it is what the model
+ * predicts. A lab no higher than the person's own says nothing about the doses
+ * and is left out like a near-zero prediction.
  */
 export function computeCalibrationPoints(sim: SimulationResult | null, results: LabResult[]): CalibrationPoint[] {
     if (!sim || !results.length) return [];
+    const endo = endogenousE2(sim);
 
     const getNearestConc_E2 = (timeH: number): number | null => {
         if (!sim.timeH.length) return null;
@@ -665,11 +705,11 @@ export function computeCalibrationPoints(sim: SimulationResult | null, results: 
     return results
         .filter(r => !isT_LabUnit(r.unit))
         .map(r => {
-            const obs = convertToPgMl(r.concValue, r.unit);
+            const obs = convertToPgMl(r.concValue, r.unit) - endo;
             let pred = interpolateConcentration_E2(sim, r.timeH);
             if (pred === null || Number.isNaN(pred)) pred = getNearestConc_E2(r.timeH);
-            if (pred === null || pred < 1 || obs <= 0) return null;
-            return { id: r.id, timeH: r.timeH, obs, pred, ratio: obs / pred };
+            if (pred === null || pred < 1 || obs <= 0 || (endo > 0 && obs < 1)) return null;
+            return { id: r.id, timeH: r.timeH, obs, pred, ratio: obs / pred, ...(endo > 0 ? { endo } : {}) };
         })
         .filter((p): p is CalibrationPoint => !!p)
         .sort((a, b) => a.timeH - b.timeH);
@@ -2600,11 +2640,15 @@ function computeMaxLifetimeH(params: PKParams, event: DoseEvent, allEvents: Dose
     return Math.ceil(13.816 / kMin);
 }
 
-/** `birthYear`: for the age adjustment (see AGE_REF_YEARS); null, or one isPlausibleBirthYear rejects, leaves it out. */
+/**
+ * `birthYear`: for the age adjustment (see AGE_REF_YEARS); null, or one isPlausibleBirthYear rejects, leaves it out.
+ * `endogenousE2PGmL`: the person's own estradiol, recorded on the result and not added to its curves (see endogenousE2).
+ */
 export function runSimulation(
     events: DoseEvent[],
     bodyWeightKG: number,
     birthYear: number | null = null,
+    endogenousE2PGmL = 0,
 ): SimulationResult | null {
     // Unmodelled drugs, and codes this build doesn't know, have no parameters
     // of their own: let through, they would fall into the estradiol branches
@@ -2747,7 +2791,16 @@ export function runSimulation(
         }
     }
 
-    return { timeH, concPGmL, concPGmL_E2, concPGmL_CPA, concNGdL_T, auc };
+    const endo = Number.isFinite(endogenousE2PGmL) && endogenousE2PGmL > 0 ? endogenousE2PGmL : 0;
+    return {
+        timeH,
+        concPGmL,
+        concPGmL_E2,
+        concPGmL_CPA,
+        concNGdL_T,
+        auc,
+        ...(endo > 0 ? { endogenousE2PGmL: endo } : {}),
+    };
 }
 
 export function interpolateConcentration_E2(sim: SimulationResult, hour: number): number | null {
@@ -3008,10 +3061,13 @@ export function labDoseContext(lab: LabResult, events: DoseEvent[]): LabDoseCont
  */
 export function rawModelAtLab(sim: SimulationResult | null, lab: LabResult): number | null {
     if (!sim) return null;
-    const v = isT_LabUnit(lab.unit)
-        ? interpolateConcentration_T(sim, lab.timeH)
-        : interpolateConcentration_E2(sim, lab.timeH);
-    return v != null && Number.isFinite(v) && v >= 1 ? v : null;
+    if (isT_LabUnit(lab.unit)) {
+        const v = interpolateConcentration_T(sim, lab.timeH);
+        return v != null && Number.isFinite(v) && v >= 1 ? v : null;
+    }
+    // The doses' share must be there to compare; the person's own goes on top.
+    const v = interpolateConcentration_E2(sim, lab.timeH);
+    return v != null && Number.isFinite(v) && v >= 1 ? v + endogenousE2(sim) : null;
 }
 
 /** The lab converted to the unit the model uses for its hormone (pg/mL E2, ng/dL T). */

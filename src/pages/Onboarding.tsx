@@ -14,7 +14,11 @@ import { useHRTMode } from '../contexts/HRTModeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Lang, TRANSLATIONS } from '../i18n/translations';
 import { PlanItem, PLAN_DRUGS } from '../utils/plan';
-import { asTitle, frequencyLabel, gelSiteName, regimenLabel } from '../utils/regimenText';
+import { asTitle, fill, frequencyLabel, gelSiteName, regimenLabel } from '../utils/regimenText';
+import { IS_CIS } from '../edition';
+import HealthCheckForm from '../components/HealthCheckForm';
+import HealthCheckSummary from '../components/HealthCheckSummary';
+import { HealthCheck, ownEstradiol } from '../utils/healthCheck';
 
 const ONBOARDING_KEY = 'app-onboarded';
 
@@ -199,6 +203,9 @@ interface OnboardingProps {
     plan: PlanItem[];
     onAddPlanItem: (item: PlanItem) => void;
     onDeletePlanItem: (id: string) => void;
+    /** The cis edition's first question, after the language: see utils/healthCheck. */
+    healthChecks?: HealthCheck[];
+    onSaveHealthCheck?: (check: HealthCheck) => void;
     onDone: () => void;
 }
 
@@ -225,6 +232,8 @@ const Onboarding: React.FC<OnboardingProps> = ({
     plan,
     onAddPlanItem,
     onDeletePlanItem,
+    healthChecks = [],
+    onSaveHealthCheck,
     onDone,
 }) => {
     const { t, lang, setLang } = useTranslation();
@@ -286,7 +295,51 @@ const Onboarding: React.FC<OnboardingProps> = ({
         { value: 'transmasc', labelKey: 'mode.transmasc', descKey: 'onboarding.mode_transmasc_desc' },
     ] as const;
 
-    const steps = [
+    // The cis edition's health check step: the form until one is saved, then
+    // what it says, with the form a tap away for a correction.
+    const [editingCheck, setEditingCheck] = useState(false);
+    const latestCheck = healthChecks.slice().sort((a, b) => b.timeH - a.timeH)[0] ?? null;
+    const own = ownEstradiol(healthChecks);
+    const healthStep = (
+        <div key="health" className="pt-8">
+            <h1 className="text-[1.625rem] font-semibold text-body">{t('onboarding.health_title')}</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted">{t('onboarding.health_subtitle')}</p>
+            <div className="mt-4 text-start">
+                {latestCheck && !editingCheck ? (
+                    <>
+                        <HealthCheckSummary check={latestCheck} t={t} />
+                        {own && (
+                            <p className="mt-3 text-xs leading-relaxed text-muted">
+                                {fill(t(own.added ? 'hc.own_added' : 'hc.own_not_added'), {
+                                    value: own.value >= 10 ? own.value.toFixed(0) : own.value.toFixed(1),
+                                })}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setEditingCheck(true)}
+                            className="tap-target mt-3 text-sm font-medium text-[var(--accent-ink)]"
+                        >
+                            {t('hc.edit')}
+                        </button>
+                    </>
+                ) : (
+                    <HealthCheckForm
+                        checkToEdit={editingCheck ? latestCheck : null}
+                        events={[]}
+                        quietSave
+                        onSave={c => {
+                            onSaveHealthCheck?.(c);
+                            setEditingCheck(false);
+                        }}
+                        onCancel={editingCheck ? () => setEditingCheck(false) : undefined}
+                    />
+                )}
+            </div>
+        </div>
+    );
+
+    const allSteps = [
         // The cat is the welcome, so it gets the room. Whatever it happens to be
         // doing at this hour is the greeting — the schedule is the point, and a
         // pose reserved for first-timers would be the one cat in the app that
@@ -487,6 +540,10 @@ const Onboarding: React.FC<OnboardingProps> = ({
             </div>
         </div>,
     ];
+    // The cis edition asks for the health check where the trans edition asks
+    // which hormones to follow: it follows estradiol only, and the check is
+    // what the estimate stands on.
+    const steps = IS_CIS ? allSteps.flatMap(s => (s.key === 'mode' ? [healthStep] : [s])) : allSteps;
 
     const isLast = step === steps.length - 1;
     // Steps are named by their keys, not their places, so adding one doesn't

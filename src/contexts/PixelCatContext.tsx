@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { IS_CIS } from '../edition';
 
-export type CatStyle = 'flag' | 'blue' | 'pink';
+// 'flag' stripes the cat in the trans pride flag, 'blue' and 'pink' are its
+// colours one at a time. The cis edition's cat has none of them: one grey
+// coat of its own, and no choice to make.
+export type CatStyle = 'flag' | 'blue' | 'pink' | 'grey';
 
-const CAT_STYLES: CatStyle[] = ['flag', 'blue', 'pink'];
+const CAT_STYLES: CatStyle[] = IS_CIS ? ['grey'] : ['flag', 'blue', 'pink'];
 
 interface PixelCatContextValue {
     showCats: boolean;
@@ -86,7 +90,7 @@ export const PixelCatProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const [catStyle, setCatStyle] = useState<CatStyle>(() => {
         const saved = localStorage.getItem(STYLE_KEY);
-        return CAT_STYLES.includes(saved as CatStyle) ? (saved as CatStyle) : 'flag';
+        return CAT_STYLES.includes(saved as CatStyle) ? (saved as CatStyle) : CAT_STYLES[0];
     });
 
     useEffect(() => {

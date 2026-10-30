@@ -42,9 +42,15 @@ const CalibrationPlot: React.FC<CalibrationPlotProps> = ({ calibration, t, lang 
     const [hover, setHover] = useState<number | null>(null);
 
     const calibrated = calibration.method !== 'off';
+    // Drawn as levels: the person's own estradiol, taken off each lab for the
+    // fit (see computeCalibrationPoints), goes back onto lab and model alike.
     const points = useMemo(
         () =>
-            calibration.points.map(p => ({ ...p, cal: calibrated ? p.pred * calibration.factorFn(p.timeH) : p.pred })),
+            calibration.points.map(p => {
+                const own = p.endo ?? 0;
+                const cal = calibrated ? p.pred * calibration.factorFn(p.timeH) : p.pred;
+                return { ...p, obs: p.obs + own, pred: p.pred + own, cal: cal + own };
+            }),
         [calibration, calibrated],
     );
 

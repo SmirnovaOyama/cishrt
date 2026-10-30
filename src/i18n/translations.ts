@@ -1,3 +1,6 @@
+import { IS_CIS } from '../edition';
+import { CIS_STRINGS } from './cis';
+
 export type Lang = 'zh' | 'zh-TW' | 'yue' | 'en' | 'ja' | 'ko' | 'tr';
 
 export const TRANSLATIONS_BASE = {
@@ -7307,3 +7310,12 @@ export const TRANSLATIONS = {
         'account.passkey': 'Geçiş anahtarı',
     },
 } as const;
+
+// The cis edition says some things differently and has screens of its own
+// (see i18n/cis). Laid over every pack here, before anything reads one, so no
+// importer can catch a pack with the trans edition's words still in it.
+if (IS_CIS) {
+    for (const [lang, strings] of Object.entries(CIS_STRINGS)) {
+        Object.assign((TRANSLATIONS as Record<string, Record<string, string>>)[lang], strings);
+    }
+}

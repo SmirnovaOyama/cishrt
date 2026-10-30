@@ -1,5 +1,6 @@
 import { DoseEvent, Ester, ExtraKey, GNRH_AGONISTS, Route, isDrugCode } from '../../logic';
 import { Regimen, hormoneOf, lapseH } from './regimen';
+import { forEdition } from './cisDrugs';
 
 /**
  * The medication plan: what the person takes and how often, entered by them.
@@ -94,8 +95,8 @@ export const customSeed = (key: string): string => {
  */
 export const PLAN_DRUGS: Record<'transfem' | 'transmasc', Partial<Record<Route, Ester[]>>> = {
     transfem: {
-        [Route.injection]: [Ester.EV, Ester.EB, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP],
-        [Route.oral]: [Ester.EV, Ester.E2, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX],
+        [Route.injection]: forEdition([Ester.EV, Ester.EB, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP]),
+        [Route.oral]: forEdition([Ester.EV, Ester.E2, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX]),
         [Route.sublingual]: [Ester.E2, Ester.EV],
         [Route.gel]: [Ester.E2],
         [Route.patchApply]: [Ester.E2],

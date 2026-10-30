@@ -8,6 +8,7 @@ import {
     CalibrationMethod,
     CalibrationHistoryMode,
     runSimulation,
+    endogenousE2,
     computeCalibration,
     isTestosteroneEster,
     isKnownEster,
@@ -303,6 +304,8 @@ export interface ForecastInput {
     /** The fitted model's own log error (CalibrationResult.fitErrPct), or null with no blood tests. */
     fitErrPct: number | null;
     target: { low: number; high: number } | null;
+    /** The person's own estradiol (pg/mL) under every estradiol level; see endogenousE2. */
+    ownE2PGmL?: number;
 }
 
 export interface Adherence {
@@ -469,9 +472,10 @@ function simulateScenario(
         horizonH,
         fitErrPct,
         target,
+        ownE2PGmL = 0,
     } = input;
     const all = [...fixed, ...projected].sort((a, b) => a.timeH - b.timeH);
-    const sim: SimulationResult | null = runSimulation(all, weight, birthYear);
+    const sim: SimulationResult | null = runSimulation(all, weight, birthYear, isTransmasc ? 0 : ownE2PGmL);
     if (!sim || !sim.timeH.length) return null;
 
     let factor: (h: number) => number = () => 1;
@@ -488,8 +492,10 @@ function simulateScenario(
             calibrationHistoryMode,
             birthYear,
         ).factorFn;
-        value = sim.timeH.map((h, i) => sim.concPGmL_E2[i] * factor(h));
+        value = sim.timeH.map((h, i) => sim.concPGmL_E2[i] * factor(h) + endogenousE2(sim));
     }
+    // Every run sits on the person's own estradiol; the error draw scales the doses' share only.
+    const own = endogenousE2(sim);
 
     const statToH = nowH + horizonH;
     const statFromH = statToH - Math.max(cycleH, 24 * 7);
@@ -522,7 +528,7 @@ function simulateScenario(
         );
         if (!runSim || !runSim.timeH.length) continue;
         const raw = isTransmasc ? runSim.timeH.map((_, i) => runSim.concNGdL_T?.[i] ?? 0) : runSim.concPGmL_E2;
-        const vals = grid.map(h => interp(runSim.timeH, raw, h) * factor(h) * scale);
+        const vals = grid.map(h => interp(runSim.timeH, raw, h) * factor(h) * scale + own);
         vals.forEach((v, i) => perHour[i].push(v));
         const s = statsOn(grid, vals, statFromH, statToH, target);
         if (s) {

@@ -95,6 +95,10 @@
     --pixel-white-shade: #e2d6da;
     --pixel-blue-edge: #6fa8c9;
     --pixel-pink-edge: #d191a5;
+    /* The cis edition's cat: a warm grey, apart from the clay quilt and the orange fish. */
+    --pixel-grey: #d9d2cc;
+    --pixel-grey-shade: #bdb3ab;
+    --pixel-grey-edge: #9c9189;
     --pixel-white-edge: #cfbfc4;
     --pixel-eye: #3f3238;
     --pixel-nose: #e58ba4;
@@ -308,6 +312,9 @@
     --pixel-white-shade: #c3b7bb;
     --pixel-blue-edge: #547588;
     --pixel-pink-edge: #966b76;
+    --pixel-grey: #b3aba5;
+    --pixel-grey-shade: #968d86;
+    --pixel-grey-edge: #786f69;
     --pixel-white-edge: #a0959a;
     --pixel-eye: #2b2226;
     --pixel-nose: #c97488;

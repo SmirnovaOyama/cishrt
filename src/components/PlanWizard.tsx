@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Ester, GEL_SITE_ORDER, GNRH_AGONISTS, Route, SL_TIER_ORDER, SublingualTierParams } from '../../logic';
+import { GEL_SITE_INDICES } from '../utils/cisDrugs';
 import Tick from './Tick';
 import Doodle from './Doodle';
 import DoseRings from './DoseRings';
@@ -281,9 +282,9 @@ const PlanWizard: React.FC<PlanWizardProps> = ({ plan, onAdd, onCancel, aboveNav
 
                     {step === 'site' && draft && (
                         <div className="mt-6">
-                            {GEL_SITE_ORDER.map((site, i) => (
+                            {GEL_SITE_INDICES.map(i => (
                                 <Row
-                                    key={site}
+                                    key={GEL_SITE_ORDER[i]}
                                     on={draft.gelSite === i}
                                     onClick={() => patch({ gelSite: i })}
                                     title={gelSiteName(i, t)}

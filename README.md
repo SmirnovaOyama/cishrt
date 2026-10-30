@@ -23,6 +23,18 @@
   <a href="#docker"><b>Self-host with Docker</b></a>
 </p>
 
+## Cis edition
+
+This repository is the cis edition of Oyama's HRT Tracker, for cis women taking estradiol, live at [cishrt.mahiro.uk](https://cishrt.mahiro.uk). It is the same code as [the original](https://github.com/xunxunProjects/Oyama-s-HRT-Tracker), built with `npm run build:cis`; `src/edition.ts` lists what changes:
+
+- Estradiol only: no testosterone mode, no anti-androgens or GnRH agonists, no scrotal gel site.
+- A health check first. Paste or type the hormone panel from a check-up (estradiol, FSH, LH, progesterone, prolactin, testosterone), and each result is read against Mayo Clinic Laboratories' adult female range for the phase it was drawn in. The estradiol in a check drawn after menopause and before HRT is your own: it is added under the model's curve, after calibration, which fits only the doses' share of a blood test.
+- Cis female reference ranges in place of the GAHT target: 15–350 pg/mL before menopause, under 10 after. Menopause HRT has no target level, so the chart shades the premenopausal range to compare with.
+- The British Menopause Society's dose bands for the dose guide and the high-dose notice.
+- A grey cat, without the trans flag.
+
+To deploy your own: `npm run wrangler:migrate:cis`, then `npm run deploy:cis` (see `wrangler.cis.toml`).
+
 # Table of Contents
 
 - [Introduction](#introduction)

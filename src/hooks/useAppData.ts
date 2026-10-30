@@ -16,6 +16,7 @@ import {
     applyPKOverrides,
     sanitizePKParams,
     isPlausibleBirthYear,
+    endogenousE2,
 } from '../../logic';
 import { createDayLabelFormatter, toDayKey } from '../utils/helpers';
 import { detectRegimens, dosesAhead, normalizeSupply, Supply } from '../utils/regimen';
@@ -42,6 +43,9 @@ import { useTranslation } from '../contexts/LanguageContext';
 import { useHRTMode } from '../contexts/HRTModeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { RecordKind, SyncState, Tombstones } from '../utils/syncMerge';
+import { HealthCheck, ownEstradiolAdded, sanitizeHealthChecks } from '../utils/healthCheck';
+import { cisLevelStatus } from '../utils/femaleRanges';
+import { IS_CIS } from '../edition';
 
 /** Namespace used while signed out. Its keys are the original, un-prefixed ones. */
 const LOCAL_OWNER = 'local';
@@ -54,6 +58,7 @@ const MODE_SUFFIXES = [
     'plan',
     'supplies',
     'deletions',
+    'health-checks',
 ] as const;
 const SHARED_SUFFIXES = [
     'weight',
@@ -259,6 +264,12 @@ export const useAppData = (
             .filter((x): x is PlanItem => x !== null);
     };
     const [plan, setPlan] = useState<PlanItem[]>(() => loadPlan(mode));
+    // Health checks (cis edition): kept on the device like the plan, and in
+    // the complete backup with it. Sanitised on every read, since they come
+    // from a hand-pasted report and from backup files alike.
+    const loadHealthChecks = (m: 'transfem' | 'transmasc') =>
+        sanitizeHealthChecks(loadJSON<unknown>(keyFor(m, 'health-checks'), []));
+    const [healthChecks, setHealthChecks] = useState<HealthCheck[]>(() => loadHealthChecks(mode));
 
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -295,6 +306,7 @@ export const useAppData = (
         setQuickDoses(loadJSON(keyFor(mode, 'quick-doses'), [] as QuickDose[]));
         setSupplies(loadSupplies(mode));
         setPlan(loadPlan(mode));
+        setHealthChecks(loadHealthChecks(mode));
         // Mode-independent, but still per-account, so they reload on the same beat.
         const savedWeight = localStorage.getItem(sharedKey('weight'));
         setWeightState(savedWeight ? parseFloat(savedWeight) : 70.0);
@@ -331,7 +343,7 @@ export const useAppData = (
         loadedScopeRef.current = scope;
         setReadyScope(prev => (prev === scope ? prev : scope));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [events, labResults, doseTemplates, quickDoses, supplies, plan]);
+    }, [events, labResults, doseTemplates, quickDoses, supplies, plan, healthChecks]);
 
     useEffect(() => {
         if (loadedScopeRef.current !== scope) return;
@@ -381,6 +393,13 @@ export const useAppData = (
         // The plan now carries what the standalone cyproterone choice used to.
         localStorage.removeItem(sharedKey('cpa-plan'));
     }, [plan, scope]);
+    useEffect(() => {
+        if (loadedScopeRef.current !== scope) return;
+        const key = keyFor(mode, 'health-checks');
+        // No key until there is something to keep: the trans edition never has one.
+        if (!healthChecks.length && localStorage.getItem(key) === null) return;
+        localStorage.setItem(key, JSON.stringify(healthChecks));
+    }, [healthChecks, scope]);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -398,9 +417,13 @@ export const useAppData = (
     // every import) first drew the chart with doses but no curve, which fell
     // through to the chart's "no records" state for as long as the simulation
     // took to run.
+    // The person's own estradiol, from a health check drawn before HRT, goes
+    // under every level read off the run (see ownEstradiol). Zero without one,
+    // and always in the trans edition, which has no health checks.
+    const ownE2 = useMemo(() => ownEstradiolAdded(healthChecks), [healthChecks]);
     const simulation = useMemo<SimulationResult | null>(
-        () => (events.length > 0 ? runSimulation(events, weight, modelBirthYear) : null),
-        [events, weight, modelBirthYear],
+        () => (events.length > 0 ? runSimulation(events, weight, modelBirthYear, ownE2) : null),
+        [events, weight, modelBirthYear, ownE2],
     );
 
     // What the person is taking now: their plan when they have entered one,
@@ -428,9 +451,9 @@ export const useAppData = (
     const simulationAhead = useMemo<SimulationResult | null>(() => {
         if (!doses.length) return null;
         const fromH = Math.min(...doses.map(e => e.timeH)) - 120 * 24;
-        return runSimulation([...events.filter(e => e.timeH >= fromH), ...doses], weight, modelBirthYear);
+        return runSimulation([...events.filter(e => e.timeH >= fromH), ...doses], weight, modelBirthYear, ownE2);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dosesKey, events, weight, modelBirthYear]);
+    }, [dosesKey, events, weight, modelBirthYear, ownE2]);
 
     // --- Derived State ---
     // Self-learning calibration: fits a personal amplitude (+ clearance, for the
@@ -454,7 +477,7 @@ export const useAppData = (
         if (!simulation) return 0;
         const h = currentTime.getTime() / 3600000;
         const baseE2 = interpolateConcentration_E2(simulation, h) || 0;
-        return baseE2 * calibrationFn(h);
+        return baseE2 * calibrationFn(h) + endogenousE2(simulation);
     }, [simulation, currentTime, calibrationFn]);
 
     // Cyproterone (ng/mL) at the current time. Uncalibrated: labs measure E2 only.
@@ -538,6 +561,7 @@ export const useAppData = (
             }
             return null;
         }
+        if (currentLevel > 0 && IS_CIS) return cisLevelStatus(currentLevel);
         if (currentLevel > 0) {
             const conc = currentLevel;
             if (conc > 300)
@@ -683,6 +707,13 @@ export const useAppData = (
             prev.some(i => i.id === item.id) ? prev.map(i => (i.id === item.id ? item : i)) : [...prev, item],
         );
     const deletePlanItem = (id: string) => setPlan(prev => prev.filter(i => i.id !== id));
+    const saveHealthCheck = (check: HealthCheck) =>
+        setHealthChecks(prev =>
+            prev.some(c => c.id === check.id)
+                ? prev.map(c => (c.id === check.id ? stamp(check) : c))
+                : [...prev, stamp(check)],
+        );
+    const deleteHealthCheck = (id: string) => setHealthChecks(prev => prev.filter(c => c.id !== id));
     const deleteQuickDose = (id: string) => setQuickDoses(prev => prev.filter(d => d.id !== id));
 
     const touchPkParams = () => localStorage.setItem(sharedKey('pk-params-at'), String(Date.now()));
@@ -895,6 +926,9 @@ export const useAppData = (
         plan,
         savePlanItem,
         deletePlanItem,
+        healthChecks,
+        saveHealthCheck,
+        deleteHealthCheck,
         currentT,
         currentStatus,
         simulationAhead,

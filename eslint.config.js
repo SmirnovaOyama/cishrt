@@ -6,7 +6,16 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
     {
-        ignores: ['**/dist/', '**/dev-dist/', '**/.wrangler/', 'public/', 'src-tauri/', 'data/', '.claude/'],
+        ignores: [
+            '**/dist/',
+            '**/dist-cis/',
+            '**/dev-dist/',
+            '**/.wrangler/',
+            'public/',
+            'src-tauri/',
+            'data/',
+            '.claude/',
+        ],
     },
     js.configs.recommended,
     tseslint.configs.recommended,

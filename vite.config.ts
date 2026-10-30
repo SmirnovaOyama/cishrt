@@ -2,8 +2,33 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+// The page shell speaks for the cis edition too: its link previews describe
+// it, and go without the trans edition's card image, which names
+// hrt.mahiro.uk.
+const cisShell = {
+    name: 'cis-shell',
+    transformIndexHtml: (html: string) =>
+        html
+            .replace(/\s*<meta (?:property|name)="(?:og|twitter):image[^>]*>/g, '')
+            .replace('content="summary_large_image"', 'content="summary"')
+            .replace(
+                /Log HRT doses and lab results, estimate hormone levels, and share a read-only record when you choose to\./g,
+                'Log estradiol doses, health checks and blood tests, and estimate your level on top of your own.',
+            ),
+};
+
+export default defineConfig(({ mode }) => {
+    // The cis women's edition (cishrt.mahiro.uk) is this same app built with
+    // `--mode cis`; src/edition.ts says what changes. It builds into its own
+    // folder, so deploying one edition can never pick up the other's files.
+    const cis = mode === 'cis';
     return {
+        define: {
+            'import.meta.env.VITE_EDITION': JSON.stringify(cis ? 'cis' : ''),
+        },
+        build: {
+            outDir: cis ? 'dist-cis' : 'dist',
+        },
         server: {
             port: 3000,
             host: '0.0.0.0',
@@ -17,6 +42,7 @@ export default defineConfig(() => {
         },
         plugins: [
             react(),
+            ...(cis ? [cisShell] : []),
             VitePWA({
                 // A new build waits until the user taps refresh in the update
                 // prompt (src/utils/swUpdate.ts registers the worker itself).
@@ -26,7 +52,9 @@ export default defineConfig(() => {
                 manifest: {
                     name: 'HRT Tracker',
                     short_name: 'HRT Tracker',
-                    description: 'Log HRT doses and estimate hormone levels',
+                    description: cis
+                        ? 'Log estradiol doses and estimate your levels from your own health check'
+                        : 'Log HRT doses and estimate hormone levels',
                     theme_color: '#FFFFFF',
                     background_color: '#FFFFFF',
                     display: 'standalone',

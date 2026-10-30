@@ -14,6 +14,7 @@ import {
     getBioavailabilityMultiplier,
     getToE2Factor,
     getDoseAdvisory,
+    DOSE_CEILING_MHT,
     isEstradiolEster,
     isKnownEster,
     sublingualThetaFromHold as thetaFromHold,
@@ -30,6 +31,8 @@ import GelFields from './dose_form/GelFields';
 import PatchFields from './dose_form/PatchFields';
 import QuickDoseButtons, { QuickDose } from './dose_form/QuickDoseButtons';
 import { useHRTMode } from '../contexts/HRTModeContext';
+import { IS_CIS } from '../edition';
+import { forEdition } from '../utils/cisDrugs';
 
 import { useEscapeLayer, SelectChevron } from './CustomSelect';
 import GuideFold from './dose_form/GuideFold';
@@ -55,12 +58,23 @@ type DoseGuideConfig = {
     requiresRate?: boolean;
 };
 
-const DOSE_GUIDE_CONFIG: Partial<Record<Route, DoseGuideConfig>> = {
-    [Route.oral]: { unitKey: 'mg_day', thresholds: [2, 4, 8, 12] },
-    [Route.sublingual]: { unitKey: 'mg_day', thresholds: [1, 2, 4, 6] },
-    [Route.patchApply]: { unitKey: 'ug_day', thresholds: [100, 200, 400, 600], requiresRate: true },
-    [Route.gel]: { unitKey: 'mg_day', thresholds: [1.5, 3, 6, 9] },
-};
+const DOSE_GUIDE_CONFIG: Partial<Record<Route, DoseGuideConfig>> = IS_CIS
+    ? {
+          // Menopause HRT's dose bands, the British Menopause Society's: low,
+          // standard, moderate and high are 1, 2, 3 and 4 mg of oral estradiol,
+          // 25, 50, 75 and 100 µg/day patches, and one to four 0.75 mg pumps of
+          // gel. Sublingual isn't one of its routes, so it gets no guide. The
+          // four levels take the cis edition's own names (see i18n/cis).
+          [Route.oral]: { unitKey: 'mg_day', thresholds: [1, 2, 3, 4] },
+          [Route.patchApply]: { unitKey: 'ug_day', thresholds: [25, 50, 75, 100], requiresRate: true },
+          [Route.gel]: { unitKey: 'mg_day', thresholds: [0.75, 1.5, 2.25, 3] },
+      }
+    : {
+          [Route.oral]: { unitKey: 'mg_day', thresholds: [2, 4, 8, 12] },
+          [Route.sublingual]: { unitKey: 'mg_day', thresholds: [1, 2, 4, 6] },
+          [Route.patchApply]: { unitKey: 'ug_day', thresholds: [100, 200, 400, 600], requiresRate: true },
+          [Route.gel]: { unitKey: 'mg_day', thresholds: [1.5, 3, 6, 9] },
+      };
 
 const LEVEL_BADGE_STYLES: Record<DoseLevelKey, string> = {
     low: 'text-[var(--status-positive)]',
@@ -72,8 +86,8 @@ const LEVEL_BADGE_STYLES: Record<DoseLevelKey, string> = {
 
 const formatGuideNumber = (val: number) => {
     if (Number.isInteger(val)) return val.toString();
-    const rounded = val < 1 ? val.toFixed(2) : val.toFixed(1);
-    return rounded.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+    // Two places where a band needs them (2.25 mg of gel), never trailing zeros.
+    return val.toFixed(2).replace(/\.?0+$/, '');
 };
 
 interface DoseFormProps {
@@ -630,9 +644,9 @@ const DoseForm: React.FC<DoseFormProps> = ({
         }
         switch (route) {
             case Route.injection:
-                return [Ester.EB, Ester.EV, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP];
+                return forEdition([Ester.EB, Ester.EV, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP]);
             case Route.oral:
-                return [Ester.E2, Ester.EV, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX];
+                return forEdition([Ester.E2, Ester.EV, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX]);
             case Route.sublingual:
                 return [Ester.E2, Ester.EV];
             default:
@@ -696,7 +710,10 @@ const DoseForm: React.FC<DoseFormProps> = ({
     // Recent-use heads-up, based on doses already logged (not the still-unsaved
     // value being typed here). Covers CPA and injections too, which the static
     // per-dose guide above doesn't — see getDoseAdvisory in logic.ts.
-    const doseAdvisory = useMemo(() => getDoseAdvisory(events), [events]);
+    const doseAdvisory = useMemo(
+        () => getDoseAdvisory(events, undefined, IS_CIS ? DOSE_CEILING_MHT : undefined),
+        [events],
+    );
 
     const guideUnitLabel = doseGuide?.config ? t(`dose.guide.unit.${doseGuide.config.unitKey}`) : '';
     const guideRangeText = doseGuide?.config
@@ -1056,8 +1073,9 @@ const DoseForm: React.FC<DoseFormProps> = ({
                             </p>
                         )}
 
-                        {/* Injection-specific guide from mtf.wiki */}
-                        {route === Route.injection && !isTransmasc && isEstradiolEster(ester) && (
+                        {/* Injection-specific guide from mtf.wiki. Its doses are
+                            feminizing HRT's, so the cis edition goes without. */}
+                        {route === Route.injection && !isTransmasc && !IS_CIS && isEstradiolEster(ester) && (
                             <div className="mt-3 border-t-(length:--hairline) border-[var(--border)] pt-3">
                                 {/* The safety warning stays in view; the rest folds. */}
                                 <GuideFold

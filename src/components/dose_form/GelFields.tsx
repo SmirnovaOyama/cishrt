@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { Ester, GEL_SITE_ORDER } from '../../../logic';
+import { GEL_SITE_INDICES } from '../../utils/cisDrugs';
 import { useHRTMode } from '../../contexts/HRTModeContext';
 import CustomSelect from '../CustomSelect';
 import GelDoseConverter from './GelDoseConverter';
@@ -52,9 +53,9 @@ const GelFields: React.FC<GelFieldsProps> = ({
                     labelledBy={siteLabelId}
                     value={String(gelSite)}
                     onChange={val => setGelSite(parseInt(val, 10))}
-                    options={GEL_SITE_ORDER.map((siteKey, idx) => ({
+                    options={GEL_SITE_INDICES.map(idx => ({
                         value: String(idx),
-                        label: t(`gel.site.${siteKey}`),
+                        label: t(`gel.site.${GEL_SITE_ORDER[idx]}`),
                     }))}
                 />
             </div>

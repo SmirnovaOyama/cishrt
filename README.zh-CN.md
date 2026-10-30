@@ -23,6 +23,18 @@
   <a href="#docker"><b>用 Docker 自行部署</b></a>
 </p>
 
+## 顺性别女性版
+
+这个仓库是 Oyama's HRT Tracker 的顺性别女性版，给在用雌二醇的顺性别女性，线上地址 [cishrt.mahiro.uk](https://cishrt.mahiro.uk)。代码和[原项目](https://github.com/xunxunProjects/Oyama-s-HRT-Tracker)相同，用 `npm run build:cis` 构建；改了什么写在 `src/edition.ts`：
+
+- 只跟踪雌二醇：没有睾酮模式，没有抗雄药和 GnRH 激动剂，没有阴囊凝胶部位。
+- 先填体检。粘贴或手动填写体检的性激素六项（雌二醇、FSH、LH、孕酮、泌乳素、睾酮），每项按抽血时的周期阶段，对照梅奥诊所实验室的成年女性参考范围。绝经后、开始 HRT 前那次体检里的雌二醇是你自己分泌的：它在校准之后计入模型曲线的底数，校准只拟合血检里药物那一部分。
+- 用顺性别女性参考范围取代 GAHT 目标：绝经前 15–350 pg/mL，绝经后低于 10。更年期激素治疗没有目标水平，所以图上画的是绝经前范围，供对照。
+- 剂量参考和高剂量提醒用英国更年期协会的剂量分级。
+- 灰色的猫，没有跨性别旗配色。
+
+自行部署：先 `npm run wrangler:migrate:cis`，再 `npm run deploy:cis`（见 `wrangler.cis.toml`）。
+
 # 目录
 
 - [介绍](#介绍)

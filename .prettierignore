@@ -1,4 +1,5 @@
 dist/
+dist-cis/
 dev-dist/
 public/
 src-tauri/

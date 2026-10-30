@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, ChevronDown, Download, Plus } from '../components/icons';
-import { ExtraKey, GEL_SITE_ORDER, Route, SL_TIER_ORDER, SublingualTierParams } from '../../logic';
+import { ExtraKey, Route, SL_TIER_ORDER, SublingualTierParams } from '../../logic';
+import { GEL_SITE_INDICES } from '../utils/cisDrugs';
 import PageHeader, { PAGE_COLUMN, headerAction, headerActionAccent } from '../components/PageHeader';
 import CustomSelect from '../components/CustomSelect';
 import Doodle from '../components/Doodle';
@@ -86,7 +87,7 @@ const AmountFields: React.FC<{
                         label={t('field.gel_site')}
                         value={String(draft.gelSite)}
                         onChange={v => onChange({ gelSite: Number(v) })}
-                        options={GEL_SITE_ORDER.map((_, i) => ({ value: String(i), label: gelSiteName(i, t) }))}
+                        options={GEL_SITE_INDICES.map(i => ({ value: String(i), label: gelSiteName(i, t) }))}
                     />
                 </div>
             )}

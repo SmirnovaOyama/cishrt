@@ -22,6 +22,8 @@ import ForecastChart, { ChartLine } from '../components/ForecastChart';
 import { useTranslation } from '../contexts/LanguageContext';
 import { useHRTMode } from '../contexts/HRTModeContext';
 import { useDialog } from '../contexts/DialogContext';
+import { IS_CIS } from '../edition';
+import { PREMENOPAUSAL_E2 } from '../utils/femaleRanges';
 import { DoseTemplate } from '../hooks/useAppData';
 import {
     Regimen,
@@ -88,6 +90,8 @@ interface ForecastProps {
     weight: number;
     birthYear: number | null;
     labResults: LabResult[];
+    /** The person's own estradiol, pg/mL, from a health check: see endogenousE2. */
+    ownE2PGmL?: number;
     calibration: CalibrationResult;
     calibrationMethod: CalibrationMethod;
     calibrationHistoryMode: CalibrationHistoryMode;
@@ -103,6 +107,7 @@ const Forecast: React.FC<ForecastProps> = ({
     weight,
     birthYear,
     labResults,
+    ownE2PGmL = 0,
     calibration,
     calibrationMethod,
     calibrationHistoryMode,
@@ -114,7 +119,7 @@ const Forecast: React.FC<ForecastProps> = ({
     const { t, lang } = useTranslation();
     const { mode, isTransmasc } = useHRTMode();
     const { showDialog } = useDialog();
-    const target = isTransmasc ? { low: 300, high: 1000 } : { low: 100, high: 200 };
+    const target = isTransmasc ? { low: 300, high: 1000 } : IS_CIS ? PREMENOPAUSAL_E2 : { low: 100, high: 200 };
     const unit = isTransmasc ? 'ng/dL' : 'pg/mL';
     const hourNow = Math.floor(nowH);
 
@@ -204,6 +209,7 @@ const Forecast: React.FC<ForecastProps> = ({
             horizonH,
             target,
             fitErrPct: labResults.length ? calibration.fitErrPct : null,
+            ownE2PGmL,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [
@@ -217,6 +223,7 @@ const Forecast: React.FC<ForecastProps> = ({
             hourNow,
             horizonH,
             calibration.fitErrPct,
+            ownE2PGmL,
         ],
     );
 
@@ -224,7 +231,7 @@ const Forecast: React.FC<ForecastProps> = ({
     // typing, and remember every spec already run so switching plans or
     // horizons back is free.
     const cache = useRef(new Map<string, Scenario | null>());
-    const inputKey = `${events.length}|${weight}|${birthYear}|${labResults.length}|${calibrationMethod}|${calibrationHistoryMode}|${isTransmasc}|${hourNow}|${horizonH}`;
+    const inputKey = `${events.length}|${weight}|${birthYear}|${labResults.length}|${calibrationMethod}|${calibrationHistoryMode}|${isTransmasc}|${hourNow}|${horizonH}|${ownE2PGmL}`;
     const [current, setCurrent] = useState<Scenario | null>(null);
     const [results, setResults] = useState<Record<string, Scenario | null>>({});
     const [busy, setBusy] = useState(true);
