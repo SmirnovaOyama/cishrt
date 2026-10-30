@@ -23,6 +23,9 @@ env:
 
 jobs:
   docker:
+    # Only the original repository publishes. A copy such as the cis edition's
+    # would ship the trans edition's build under its own name.
+    if: github.repository == 'xunxunProjects/Oyama-s-HRT-Tracker'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
