@@ -96,7 +96,17 @@ export const customSeed = (key: string): string => {
 export const PLAN_DRUGS: Record<'transfem' | 'transmasc', Partial<Record<Route, Ester[]>>> = {
     transfem: {
         [Route.injection]: forEdition([Ester.EV, Ester.EB, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP]),
-        [Route.oral]: forEdition([Ester.EV, Ester.E2, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX]),
+        [Route.oral]: forEdition([
+            Ester.EV,
+            Ester.E2,
+            Ester.CPA,
+            Ester.SPIRO,
+            Ester.BICA,
+            Ester.P4,
+            Ester.DYD,
+            Ester.MPA,
+            Ester.RLX,
+        ]),
         [Route.sublingual]: [Ester.E2, Ester.EV],
         [Route.gel]: [Ester.E2],
         [Route.patchApply]: [Ester.E2],
@@ -120,6 +130,10 @@ export const usualFor = (route: Route, ester: Ester): { dose: string; freq: stri
     if (ester === Ester.SPIRO) return { dose: '50', freq: 'd2' };
     if (ester === Ester.BICA) return { dose: '25', freq: 'd1' };
     if (ester === Ester.MPA) return { dose: '10', freq: 'd1' };
+    // Continuous combined menopause HRT: 100 mg of micronized progesterone or
+    // 10 mg of dydrogesterone every day, beside the estradiol.
+    if (ester === Ester.P4) return { dose: '100', freq: 'd1' };
+    if (ester === Ester.DYD) return { dose: '10', freq: 'd1' };
     if (GNRH_AGONISTS.has(ester)) return { dose: '3.75', freq: 'e28' };
     if (ester === Ester.RLX) return { dose: '60', freq: 'd1' };
     if (route === Route.patchApply) return { dose: '100', freq: 'e3.5' };

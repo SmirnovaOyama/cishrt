@@ -13,6 +13,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { Regimen, Supply, Pack, PackKind, supplyStatus, packKindsFor, defaultPack, packUnitMG } from '../utils/regimen';
 import { supplyLabel, intervalLabel, dueLabel, fill, fillNodes, remainingLabel, packUnit } from '../utils/regimenText';
 import { usualFor } from '../utils/plan';
+import { forEdition } from '../utils/cisDrugs';
 import { inertWhen } from '../utils/inert';
 
 const on = 'text-[var(--text)]';
@@ -42,6 +43,8 @@ const STOCKABLE: Record<'transfem' | 'transmasc', [Route, Ester][]> = {
         [Route.oral, Ester.CPA],
         [Route.oral, Ester.SPIRO],
         [Route.oral, Ester.BICA],
+        [Route.oral, Ester.P4],
+        [Route.oral, Ester.DYD],
         [Route.oral, Ester.MPA],
         [Route.oral, Ester.RLX],
         [Route.sublingual, Ester.E2],
@@ -226,7 +229,10 @@ const Supplies: React.FC<SuppliesProps> = ({
             out.push({ value, label: supplyLabel({ route, ester }, t), description });
         };
         regimens.forEach(r => add(r.route, r.ester, intervalLabel(r.intervalH, t)));
-        STOCKABLE[mode].forEach(([r, e]) => add(r, e));
+        // Each edition stocks only its own drugs (see forEdition).
+        STOCKABLE[mode].forEach(([r, e]) => {
+            if (forEdition([e]).length) add(r, e);
+        });
         return out;
     }, [regimens, mode, t]);
 

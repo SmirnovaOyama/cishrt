@@ -14,7 +14,18 @@ import {
     isPlausibleBodyWeightKG,
     isPlausibleBirthYear,
 } from '../../logic';
-import { MODE_KEYS, ModeKey, SyncState, Tombstones, pruneTombstones, sanitizeTombstones } from './syncMerge';
+import {
+    MODE_KEYS,
+    ModeKey,
+    SyncState,
+    TombstoneMap,
+    Tombstones,
+    pruneTombstoneMap,
+    pruneTombstones,
+    sanitizeTombstoneMap,
+    sanitizeTombstones,
+} from './syncMerge';
+import { HealthCheck, sanitizeHealthChecks } from './healthCheck';
 import { cleanDoseMG } from './cleanDose';
 
 /** Minimal storage surface used by the pure backup helpers. */
@@ -48,6 +59,8 @@ export interface ActiveBackupState {
     events: DoseEvent[];
     labResults: LabResult[];
     doseTemplates: DoseTemplate[];
+    /** The cis edition's; read from storage when left out. */
+    healthChecks?: HealthCheck[];
     weight: number;
     birthYear: number | null;
     pkParams: PKCustomParams | null;
@@ -68,6 +81,9 @@ export interface ExportPayload {
             labResults: LabResult[];
             doseTemplates: DoseTemplate[];
             deletions: Tombstones;
+            /** Present once the device keeps health checks (the cis edition's). */
+            healthChecks?: HealthCheck[];
+            healthCheckDeletions?: TombstoneMap;
         }
     >;
     events: DoseEvent[];
@@ -83,6 +99,8 @@ export interface AppliedSyncedState {
         labResults: LabResult[];
         doseTemplates: DoseTemplate[];
         deletions: Tombstones;
+        /** Only when the synced state carried health checks. */
+        healthChecks?: HealthCheck[];
     };
     weight?: number;
     birthYear?: number | null;
@@ -123,6 +141,36 @@ export const loadJSONFromStorage = <T>(storage: StorageLike, key: string, fallba
 
 export const readTombstonesFromStorage = (storage: StorageLike, owner: string, mode: ModeKey): Tombstones =>
     sanitizeTombstones(loadJSONFromStorage<unknown>(storage, modeKeyFor(owner, mode, 'deletions'), null));
+
+/**
+ * Health checks and their deletion log, as sync carries them: nothing at all
+ * for a mode that never kept one, so its payload is as it was before them.
+ */
+export const readHealthChecksFromStorage = (
+    storage: StorageLike,
+    owner: string,
+    mode: ModeKey,
+    inMemory?: HealthCheck[],
+): { healthChecks?: HealthCheck[]; healthCheckDeletions?: TombstoneMap } => {
+    const checksKey = modeKeyFor(owner, mode, 'health-checks');
+    const deletionsKey = modeKeyFor(owner, mode, 'health-check-deletions');
+    if (inMemory === undefined && storage.getItem(checksKey) === null && storage.getItem(deletionsKey) === null)
+        return {};
+    return {
+        healthChecks: inMemory ?? sanitizeHealthChecks(loadJSONFromStorage<unknown>(storage, checksKey, [])),
+        healthCheckDeletions: sanitizeTombstoneMap(loadJSONFromStorage<unknown>(storage, deletionsKey, null)),
+    };
+};
+
+export const writeHealthCheckDeletionsToStorage = (
+    storage: StorageLike,
+    owner: string,
+    mode: ModeKey,
+    next: TombstoneMap,
+    now = Date.now(),
+): void => {
+    storage.setItem(modeKeyFor(owner, mode, 'health-check-deletions'), JSON.stringify(pruneTombstoneMap(next, now)));
+};
 
 export const writeTombstonesToStorage = (
     storage: StorageLike,
@@ -223,6 +271,7 @@ export const buildExportPayloadFromStorage = (
         labResults: loadJSONFromStorage<LabResult[]>(storage, modeKeyFor(owner, m, 'lab-results'), []),
         doseTemplates: loadJSONFromStorage<DoseTemplate[]>(storage, modeKeyFor(owner, m, 'dose-templates'), []),
         deletions: readTombstonesFromStorage(storage, owner, m),
+        ...readHealthChecksFromStorage(storage, owner, m),
     });
     const modes = {
         transfem: readMode('transfem'),
@@ -234,6 +283,7 @@ export const buildExportPayloadFromStorage = (
         labResults: active.labResults,
         doseTemplates: active.doseTemplates,
         deletions: readTombstonesFromStorage(storage, owner, activeMode),
+        ...readHealthChecksFromStorage(storage, owner, activeMode, active.healthChecks),
     };
 
     return {
@@ -269,19 +319,33 @@ export const applySyncedStateToStorage = (
     state: SyncState,
     now = Date.now(),
 ): AppliedSyncedState => {
-    const clean = MODE_KEYS.map(m => ({
-        m,
-        events: sanitizeImportedEvents(state.modes[m].events),
-        labResults: sanitizeImportedLabResults(state.modes[m].labResults),
-        doseTemplates: sanitizeImportedTemplates(state.modes[m].doseTemplates),
-        deletions: sanitizeTombstones(state.modes[m].deletions),
-    }));
+    const clean = MODE_KEYS.map(m => {
+        const synced = state.modes[m];
+        return {
+            m,
+            events: sanitizeImportedEvents(synced.events),
+            labResults: sanitizeImportedLabResults(synced.labResults),
+            doseTemplates: sanitizeImportedTemplates(synced.doseTemplates),
+            deletions: sanitizeTombstones(synced.deletions),
+            // Left as they are when the state says nothing about them.
+            ...(synced.healthChecks !== undefined || synced.healthCheckDeletions !== undefined
+                ? {
+                      healthChecks: sanitizeHealthChecks(synced.healthChecks ?? []),
+                      healthCheckDeletions: sanitizeTombstoneMap(synced.healthCheckDeletions),
+                  }
+                : {}),
+        };
+    });
 
     for (const block of clean) {
         writeTombstonesToStorage(storage, owner, block.m, block.deletions, now);
         storage.setItem(modeKeyFor(owner, block.m, 'events'), JSON.stringify(block.events));
         storage.setItem(modeKeyFor(owner, block.m, 'lab-results'), JSON.stringify(block.labResults));
         storage.setItem(modeKeyFor(owner, block.m, 'dose-templates'), JSON.stringify(block.doseTemplates));
+        if (block.healthChecks !== undefined) {
+            writeHealthCheckDeletionsToStorage(storage, owner, block.m, block.healthCheckDeletions ?? {}, now);
+            storage.setItem(modeKeyFor(owner, block.m, 'health-checks'), JSON.stringify(block.healthChecks));
+        }
     }
 
     const active = clean.find(block => block.m === activeMode);

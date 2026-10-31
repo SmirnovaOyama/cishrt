@@ -339,6 +339,7 @@ const AppContent = () => {
         events,
         labResults,
         doseTemplates,
+        healthChecks,
         weight,
         birthYear,
         pkParams,

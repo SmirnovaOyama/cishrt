@@ -9,6 +9,10 @@
  */
 
 const EN: Record<string, string> = {
+    'ester.P4': 'Micronized progesterone',
+    'ester.DYD': 'Dydrogesterone',
+    'products.oral.P4': 'Utrogestan, Prometrium',
+    'products.oral.DYD': 'Duphaston',
     'import.bundle_cat_healthChecks': 'health checks',
     'onboarding.welcome_subtitle':
         'This app keeps track of your estradiol doses and estimates your level between blood tests, starting from your own health check. Pick a language to start.',
@@ -86,6 +90,10 @@ const EN: Record<string, string> = {
 };
 
 const ZH: Record<string, string> = {
+    'ester.P4': '微粒化黄体酮',
+    'ester.DYD': '地屈孕酮',
+    'products.oral.P4': '安琪坦 Utrogestan、益玛欣',
+    'products.oral.DYD': '达芙通 Duphaston',
     'import.bundle_cat_healthChecks': '体检',
     'onboarding.welcome_subtitle':
         '这个小工具会记下你的雌激素用药，并从你自己的体检结果出发，估算两次抽血之间的雌二醇水平。先挑一个顺手的语言吧。',
@@ -161,6 +169,10 @@ const ZH: Record<string, string> = {
 };
 
 const ZH_TW: Record<string, string> = {
+    'ester.P4': '微粒化黃體素',
+    'ester.DYD': '地屈孕酮',
+    'products.oral.P4': '安琪坦 Utrogestan',
+    'products.oral.DYD': '達芙通 Duphaston',
     'import.bundle_cat_healthChecks': '健檢',
     'onboarding.welcome_subtitle':
         '這個小工具會記下你的雌激素用藥，並從你自己的健檢結果出發，估算兩次抽血之間的雌二醇水平。先挑一個順手的語言吧。',
@@ -236,6 +248,10 @@ const ZH_TW: Record<string, string> = {
 };
 
 const JA: Record<string, string> = {
+    'ester.P4': '天然型プロゲステロン',
+    'ester.DYD': 'ジドロゲステロン',
+    'products.oral.P4': 'エフメノ、Utrogestan',
+    'products.oral.DYD': 'デュファストン',
     'import.bundle_cat_healthChecks': '健康診断',
     'onboarding.welcome_subtitle':
         'このアプリはエストラジオールの投薬を記録し、あなた自身の健康診断の結果から、採血と採血のあいだの値を推定します。まずは言語を選んでください。',
@@ -313,6 +329,10 @@ const JA: Record<string, string> = {
 };
 
 const KO: Record<string, string> = {
+    'ester.P4': '미분화 프로게스테론',
+    'ester.DYD': '디드로게스테론',
+    'products.oral.P4': '유트로게스탄 Utrogestan',
+    'products.oral.DYD': '듀파스톤 Duphaston',
     'import.bundle_cat_healthChecks': '건강검진',
     'onboarding.welcome_subtitle':
         '이 앱은 에스트라디올 복용을 기록하고, 당신의 건강검진 결과에서 출발해 검사와 검사 사이의 수치를 추정합니다. 먼저 언어를 고르세요.',
@@ -390,6 +410,10 @@ const KO: Record<string, string> = {
 };
 
 const TR: Record<string, string> = {
+    'ester.P4': 'Mikronize progesteron',
+    'ester.DYD': 'Didrogesteron',
+    'products.oral.P4': 'Progestan, Utrogestan',
+    'products.oral.DYD': 'Duphaston',
     'import.bundle_cat_healthChecks': 'sağlık kontrolleri',
     'onboarding.welcome_subtitle':
         'Bu uygulama östradiol dozlarını kaydeder ve kendi sağlık kontrolünden yola çıkarak iki kan tahlili arasındaki düzeyini tahmin eder. Başlamak için bir dil seç.',

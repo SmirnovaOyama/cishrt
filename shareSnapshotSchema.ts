@@ -22,6 +22,8 @@ export const SHARE_ESTERS = new Set([
     'LEUP',
     'TRIP',
     'RLX',
+    'P4',
+    'DYD',
     'T',
     'TC',
     'TE',
@@ -41,6 +43,8 @@ export const TRANSFEM_ESTERS = new Set([
     'LEUP',
     'TRIP',
     'RLX',
+    'P4',
+    'DYD',
 ]);
 export const TRANSMASC_ESTERS = new Set(['T', 'TC', 'TE', 'TU']);
 export const SHARE_EXTRA_KEYS = new Set([

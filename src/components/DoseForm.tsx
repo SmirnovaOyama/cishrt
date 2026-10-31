@@ -646,7 +646,17 @@ const DoseForm: React.FC<DoseFormProps> = ({
             case Route.injection:
                 return forEdition([Ester.EB, Ester.EV, Ester.EC, Ester.EN, Ester.EU, Ester.LEUP, Ester.TRIP]);
             case Route.oral:
-                return forEdition([Ester.E2, Ester.EV, Ester.CPA, Ester.SPIRO, Ester.BICA, Ester.MPA, Ester.RLX]);
+                return forEdition([
+                    Ester.E2,
+                    Ester.EV,
+                    Ester.CPA,
+                    Ester.SPIRO,
+                    Ester.BICA,
+                    Ester.P4,
+                    Ester.DYD,
+                    Ester.MPA,
+                    Ester.RLX,
+                ]);
             case Route.sublingual:
                 return [Ester.E2, Ester.EV];
             default:

@@ -27,6 +27,10 @@ export enum Ester {
     LEUP = 'LEUP', // Leuprorelin (GnRH agonist)
     TRIP = 'TRIP', // Triptorelin (GnRH agonist)
     RLX = 'RLX', // Raloxifene (SERM)
+    // Progestogens for menopause HRT, which the cis edition offers: what a
+    // woman with a uterus takes beside estradiol. No level model either.
+    P4 = 'P4', // Micronized progesterone
+    DYD = 'DYD', // Dydrogesterone
     // Transmasculine HRT (testosterone) esters
     T = 'T', // Unesterified testosterone (gel / patch base)
     TC = 'TC', // Testosterone Cypionate
@@ -53,6 +57,8 @@ export const UNMODELLED_DRUGS: ReadonlySet<Ester> = new Set<Ester>([
     Ester.LEUP,
     Ester.TRIP,
     Ester.RLX,
+    Ester.P4,
+    Ester.DYD,
 ]);
 
 /** GnRH agonists: a depot injection every few weeks rather than a daily pill. */
@@ -1292,6 +1298,8 @@ const EsterInfo = {
     [Ester.LEUP]: { name: 'Leuprorelin', mw: 1209.42 },
     [Ester.TRIP]: { name: 'Triptorelin', mw: 1311.45 },
     [Ester.RLX]: { name: 'Raloxifene', mw: 473.58 },
+    [Ester.P4]: { name: 'Progesterone', mw: 314.46 },
+    [Ester.DYD]: { name: 'Dydrogesterone', mw: 312.45 },
     // Testosterone esters (MW = parent + ester group)
     [Ester.T]: { name: 'Testosterone', mw: 288.42 },
     [Ester.TC]: { name: 'Testosterone Cypionate', mw: 412.6 },

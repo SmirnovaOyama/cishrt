@@ -26,6 +26,8 @@ import {
     QuickDose,
     applySyncedStateToStorage,
     buildExportPayloadFromStorage,
+    readHealthChecksFromStorage,
+    writeHealthCheckDeletionsToStorage,
     modeKeyFor,
     nsFor,
     readTombstonesFromStorage,
@@ -42,7 +44,7 @@ import {
 import { useTranslation } from '../contexts/LanguageContext';
 import { useHRTMode } from '../contexts/HRTModeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { RecordKind, SyncState, Tombstones } from '../utils/syncMerge';
+import { RecordKind, SyncState, Tombstones, hasOwn, nullMap } from '../utils/syncMerge';
 import { HealthCheck, ownEstradiolAdded, sanitizeHealthChecks } from '../utils/healthCheck';
 import { cisLevelStatus } from '../utils/femaleRanges';
 import { IS_CIS } from '../edition';
@@ -59,6 +61,7 @@ const MODE_SUFFIXES = [
     'supplies',
     'deletions',
     'health-checks',
+    'health-check-deletions',
 ] as const;
 const SHARED_SUFFIXES = [
     'weight',
@@ -707,13 +710,37 @@ export const useAppData = (
             prev.some(i => i.id === item.id) ? prev.map(i => (i.id === item.id ? item : i)) : [...prev, item],
         );
     const deletePlanItem = (id: string) => setPlan(prev => prev.filter(i => i.id !== id));
-    const saveHealthCheck = (check: HealthCheck) =>
+    // Health checks sync like the records above, with a deletion log of their
+    // own (see readHealthChecksFromStorage), kept the same way: a deletion
+    // leaves a tombstone, and putting a check back by hand clears it.
+    const healthCheckDeletions = () =>
+        readHealthChecksFromStorage(localStorage, owner, mode).healthCheckDeletions ?? nullMap<number>();
+    const recordHealthCheckDeletions = (ids: string[]) => {
+        if (!ids.length) return;
+        const next = healthCheckDeletions();
+        const at = Date.now();
+        for (const id of ids) next[id] = at;
+        writeHealthCheckDeletionsToStorage(localStorage, owner, mode, next);
+    };
+    const forgetHealthCheckDeletions = (ids: string[]) => {
+        const next = healthCheckDeletions();
+        const kept = ids.filter(id => hasOwn(next, id));
+        if (!kept.length) return;
+        for (const id of kept) delete next[id];
+        writeHealthCheckDeletionsToStorage(localStorage, owner, mode, next);
+    };
+    const saveHealthCheck = (check: HealthCheck) => {
+        forgetHealthCheckDeletions([check.id]);
         setHealthChecks(prev =>
             prev.some(c => c.id === check.id)
                 ? prev.map(c => (c.id === check.id ? stamp(check) : c))
                 : [...prev, stamp(check)],
         );
-    const deleteHealthCheck = (id: string) => setHealthChecks(prev => prev.filter(c => c.id !== id));
+    };
+    const deleteHealthCheck = (id: string) => {
+        recordHealthCheckDeletions([id]);
+        setHealthChecks(prev => prev.filter(c => c.id !== id));
+    };
     const deleteQuickDose = (id: string) => setQuickDoses(prev => prev.filter(d => d.id !== id));
 
     const touchPkParams = () => localStorage.setItem(sharedKey('pk-params-at'), String(Date.now()));
@@ -788,6 +815,7 @@ export const useAppData = (
             events,
             labResults,
             doseTemplates,
+            healthChecks: healthChecks.length ? healthChecks : undefined,
             weight,
             birthYear,
             pkParams,
@@ -843,7 +871,11 @@ export const useAppData = (
         if (active?.quickDoses !== undefined) setQuickDoses(active.quickDoses);
         if (active?.supplies !== undefined) setSupplies(active.supplies);
         if (active?.plan !== undefined) setPlan(active.plan);
-        if (active?.healthChecks !== undefined) setHealthChecks(active.healthChecks);
+        if (active?.healthChecks !== undefined) {
+            // Restored from a file on purpose, so sync mustn't delete them again.
+            forgetHealthCheckDeletions(active.healthChecks.map(c => c.id));
+            setHealthChecks(active.healthChecks);
+        }
         if (result.weight !== undefined) setWeightState(result.weight);
         if (result.pkParams !== undefined) setPkParamsState(result.pkParams);
         if (result.calibration) {
@@ -859,6 +891,7 @@ export const useAppData = (
      * installs the active mode's arrays and scalar state after it returns.
      */
     const replaceCompleteBackupBundle = (parsed: unknown) => {
+        const before = healthChecks.map(c => c.id);
         const result = replaceCompleteBackupBundleToStorage(parsed, {
             storage: localStorage,
             owner,
@@ -872,7 +905,14 @@ export const useAppData = (
         if (active?.quickDoses !== undefined) setQuickDoses(active.quickDoses);
         if (active?.supplies !== undefined) setSupplies(active.supplies);
         if (active?.plan !== undefined) setPlan(active.plan);
-        if (active?.healthChecks !== undefined) setHealthChecks(active.healthChecks);
+        if (active?.healthChecks !== undefined) {
+            // Replaced, so checks the file leaves out are deleted, and sync must
+            // hear it; the ones it brings are restored on purpose.
+            const kept = new Set(active.healthChecks.map(c => c.id));
+            recordHealthCheckDeletions(before.filter(id => !kept.has(id)));
+            forgetHealthCheckDeletions([...kept]);
+            setHealthChecks(active.healthChecks);
+        }
         if (result.weight !== undefined) setWeightState(result.weight);
         if (result.pkParams !== undefined) setPkParamsState(result.pkParams);
         setCalibrationMethodState(result.calibration.method);
@@ -898,6 +938,7 @@ export const useAppData = (
         setEvents(applied.active.events);
         setLabResults(applied.active.labResults);
         setDoseTemplates(applied.active.doseTemplates);
+        if (applied.active.healthChecks !== undefined) setHealthChecks(applied.active.healthChecks);
         if (applied.weight !== undefined) setWeightState(applied.weight);
         if (applied.birthYear !== undefined) setBirthYearState(applied.birthYear);
         if (applied.pkParams !== undefined) setPkParamsState(applied.pkParams);

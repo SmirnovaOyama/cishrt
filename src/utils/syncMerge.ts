@@ -26,6 +26,10 @@
  *
  * Scalars that aren't records — body weight, year of birth, PK overrides — carry their own
  * last-write timestamp and are resolved last-write-wins.
+ *
+ * The cis edition's health checks ride along in each mode block under the same
+ * three rules, with a deletion log of their own. They are optional there: a
+ * payload that never held any reads, merges and fingerprints as it always did.
  */
 
 import { isPlausibleBirthYear, isTestosteroneEster, isT_LabUnit } from '../../logic';
@@ -46,7 +50,13 @@ export interface ModeBlock {
     labResults: any[];
     doseTemplates: any[];
     deletions: Tombstones;
+    /** The cis edition's health checks; absent where a device never kept any. */
+    healthChecks?: any[];
+    healthCheckDeletions?: TombstoneMap;
 }
+
+/** What content a record's fingerprint covers: the synced kinds, and health checks. */
+type ContentKind = RecordKind | 'healthChecks';
 
 export interface SyncState {
     modes: Record<ModeKey, ModeBlock>;
@@ -226,6 +236,12 @@ export function normalizeSyncState(payload: unknown): SyncState {
                 labResults: asArray(block.labResults),
                 doseTemplates: asArray(block.doseTemplates),
                 deletions: sanitizeTombstones(block.deletions),
+                ...(block.healthChecks !== undefined || block.healthCheckDeletions !== undefined
+                    ? {
+                          healthChecks: asArray(block.healthChecks),
+                          healthCheckDeletions: sanitizeTombstoneMap(block.healthCheckDeletions),
+                      }
+                    : {}),
             };
         }
     } else {
@@ -250,6 +266,11 @@ export function normalizeSyncState(payload: unknown): SyncState {
     return state;
 }
 
+/** Whether a block holds any health check, or the deletion of one. */
+function hasHealthChecks(block: ModeBlock): boolean {
+    return (block.healthChecks?.length ?? 0) > 0 || Object.keys(block.healthCheckDeletions ?? {}).length > 0;
+}
+
 // --- Content fingerprints ---------------------------------------------------
 
 /**
@@ -257,10 +278,11 @@ export function normalizeSyncState(payload: unknown): SyncState {
  * `updatedAt` is excluded on purpose: it is bookkeeping, and including it would
  * make two byte-identical records look like a conflict.
  */
-const CONTENT_FIELDS: Record<RecordKind, readonly string[]> = {
+const CONTENT_FIELDS: Record<ContentKind, readonly string[]> = {
     events: ['route', 'ester', 'doseMG', 'timeH', 'extras'],
     labResults: ['unit', 'concValue', 'timeH', 'assay'],
     doseTemplates: ['name', 'route', 'ester', 'doseMG', 'extras'],
+    healthChecks: ['timeH', 'phase', 'beforeHrt', 'values'],
 };
 
 export function stableString(value: unknown): string {
@@ -279,7 +301,7 @@ export function stableString(value: unknown): string {
     return Number.isFinite(n) && String(value).trim() !== '' ? String(n) : String(value);
 }
 
-function contentFingerprint(kind: RecordKind, record: any): string {
+function contentFingerprint(kind: ContentKind, record: any): string {
     return CONTENT_FIELDS[kind]
         .map(f => {
             const value = record?.[f];
@@ -300,7 +322,7 @@ function recordStamp(record: any): number {
 
 // --- Merge ------------------------------------------------------------------
 
-function mergeKind(kind: RecordKind, local: any[], remote: any[], tombstones: TombstoneMap, stats: MergeStats): any[] {
+function mergeKind(kind: ContentKind, local: any[], remote: any[], tombstones: TombstoneMap, stats: MergeStats): any[] {
     const out = new Map<string, any>();
     const dropped = new Set<string>();
 
@@ -426,6 +448,24 @@ export function mergeSyncStates(local: SyncState, remote: SyncState | null): Mer
             ),
             deletions,
         };
+        // Health checks only where either side has kept some: a block without
+        // them stays without them, so the trans edition's payloads don't change.
+        const mine = local.modes[m];
+        const theirs = remote.modes[m];
+        if (hasHealthChecks(mine) || hasHealthChecks(theirs)) {
+            const healthCheckDeletions = mergeTombstoneMaps(
+                mine.healthCheckDeletions ?? nullMap(),
+                theirs.healthCheckDeletions ?? nullMap(),
+            );
+            merged.modes[m].healthChecks = mergeKind(
+                'healthChecks',
+                mine.healthChecks ?? [],
+                theirs.healthChecks ?? [],
+                healthCheckDeletions,
+                stats,
+            );
+            merged.modes[m].healthCheckDeletions = healthCheckDeletions;
+        }
     }
 
     const weight = resolveScalar(local.weight, local.weightUpdatedAt, remote.weight, remote.weightUpdatedAt);
@@ -465,6 +505,7 @@ export function hasContent(state: SyncState): boolean {
             if ((block[kind] as any[]).length > 0) return true;
             if (Object.keys(block.deletions[kind]).length > 0) return true;
         }
+        if (hasHealthChecks(block)) return true;
     }
     return state.weightUpdatedAt > 1 || state.birthYearUpdatedAt > 1 || state.pkParamsUpdatedAt > 1;
 }
@@ -491,6 +532,23 @@ export function fingerprintState(state: SyncState): string {
                 .sort();
             parts.push(`${m}.${kind}:${rows.join(';')}`);
             parts.push(`${m}.${kind}.del:${Object.keys(block.deletions[kind]).sort().join(';')}`);
+        }
+        // Only when there are some, so a state without health checks reads
+        // exactly as it did before they existed.
+        if (hasHealthChecks(block)) {
+            const rows = (block.healthChecks ?? [])
+                .map(r => {
+                    const id = recordId(r);
+                    return id ? `${id}=${contentFingerprint('healthChecks', r)}` : null;
+                })
+                .filter((r): r is string => r !== null)
+                .sort();
+            parts.push(`${m}.healthChecks:${rows.join(';')}`);
+            parts.push(
+                `${m}.healthChecks.del:${Object.keys(block.healthCheckDeletions ?? {})
+                    .sort()
+                    .join(';')}`,
+            );
         }
     }
     parts.push(`weight:${state.weight === undefined ? '' : stableString(state.weight)}`);
