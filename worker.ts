@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { MAX_CLOUD_BACKUP_BYTES } from './backupPolicy';
 import { getContent, listContent, storeContent } from './contentStore';
+import { readTextOverrides } from './textOverrides';
 import { addToolLoginFields, handleToolProtected, toolVersionBody } from './toolApi';
 import { handleHrtService, handleHrtWeb, hrtCapability, hrtDeviceMatchesToken } from './hrtPairing';
 import { exchangeF2fCliCode, handleF2fService, handleF2fWeb, sweepF2fCohorts } from './f2f';
@@ -1259,6 +1260,29 @@ export default {
                             // Short: an operator who posts or corrects a notice wants it out
                             // now, and the body is a few hundred bytes.
                             'Cache-Control': 'public, max-age=60',
+                        },
+                    }),
+                );
+            }
+
+            // Rewritten text (the cis edition's editor, textOverrides.ts). Public
+            // like the notice: every visitor's app lays it over its own words.
+            if (url.pathname === '/api/text' && request.method === 'GET') {
+                const clientIP = getClientIP(request, env);
+                const limitKey = clientIP ? `text:${clientIP}` : 'text:global-noip';
+                if (!(await checkRateLimit(env, limitKey, clientIP ? 60 : 300))) {
+                    return jsonError('RATE_LIMITED', 'Too many requests. Please try again later.', 429, {
+                        'Retry-After': '60',
+                    });
+                }
+                return withSecurityHeaders(
+                    new Response(JSON.stringify(await readTextOverrides(env.DB)), {
+                        status: 200,
+                        headers: {
+                            ...corsHeaders,
+                            'Content-Type': 'application/json',
+                            // Checked on every load, so an edit is live on the next one.
+                            'Cache-Control': 'no-cache',
                         },
                     }),
                 );

@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { TRANSLATIONS, Lang } from '../i18n/translations';
 import { setAppLocale } from '../i18n/locale';
+import { cachedTextOverrides, fetchTextOverrides } from '../i18n/overrides';
+import { IS_CIS } from '../edition';
+import type { TextOverrides } from '../../textOverrides';
 
 const LanguageContext = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: string) => string } | null>(
     null,
@@ -35,7 +38,7 @@ const LANG_LOCALE: Record<Lang, string> = {
  * every key in the app, so nothing can fall all the way through to a raw
  * dotted key.
  */
-const FALLBACK: Record<Lang, readonly Lang[]> = {
+export const FALLBACK: Record<Lang, readonly Lang[]> = {
     zh: ['en'],
     'zh-TW': ['zh', 'en'],
     yue: ['zh-TW', 'zh', 'en'],
@@ -49,22 +52,36 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('hrt-lang') as Lang) || 'zh');
     setAppLocale(LANG_LOCALE[lang] ?? lang);
 
+    // The cis edition's operator rewrites its text in a separate editor (see
+    // textOverrides.ts). Those words come first in every pack, so they win
+    // wherever a key is looked up, fallbacks included.
+    const [overrides, setOverrides] = useState<TextOverrides>(() => (IS_CIS ? cachedTextOverrides() : {}));
     useEffect(() => {
-        localStorage.setItem('hrt-lang', lang);
-        document.title = (TRANSLATIONS as Record<string, Record<string, string>>)[lang]?.['app.title'] ?? 'HRT Tracker';
-        document.documentElement.lang = LANG_LOCALE[lang] ?? lang;
-    }, [lang]);
+        if (!IS_CIS) return;
+        let live = true;
+        void fetchTextOverrides().then(next => {
+            if (live && next) setOverrides(next);
+        });
+        return () => {
+            live = false;
+        };
+    }, []);
 
     const t = (key: string) => {
         const packs = TRANSLATIONS as Record<string, Record<string, string>>;
-        const own = packs[lang]?.[key];
-        if (own !== undefined) return own;
-        for (const alt of FALLBACK[lang] ?? FALLBACK.zh) {
-            const value = packs[alt]?.[key];
+        for (const pack of [lang, ...(FALLBACK[lang] ?? FALLBACK.zh)]) {
+            const value = overrides[pack]?.[key] ?? packs[pack]?.[key];
             if (value !== undefined) return value;
         }
         return key;
     };
+
+    useEffect(() => {
+        localStorage.setItem('hrt-lang', lang);
+        document.title = t('app.title');
+        document.documentElement.lang = LANG_LOCALE[lang] ?? lang;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lang, overrides]);
 
     return <LanguageContext.Provider value={{ lang, setLang, t }}>{children}</LanguageContext.Provider>;
 };

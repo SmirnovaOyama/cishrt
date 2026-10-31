@@ -1,0 +1,37 @@
+# The cis edition's text editor (editorWorker.ts), deployed to
+# cishrt-text.mahiro.uk. It writes the `text_overrides` table in the cis
+# site's own database, which the site reads at GET /api/text.
+#
+#   npm run deploy:editor
+#   npx wrangler secret put EDITOR_PASSWORD -c wrangler.editor.toml
+name = "cishrt-text"
+main = "editorWorker.ts"
+compatibility_date = "2025-12-04"
+
+routes = [{ pattern = "cishrt-text.mahiro.uk", custom_domain = true }]
+
+[build]
+command = "test -d dist-editor || npm run build:editor"
+
+# Every request passes through the Worker, so the page gets its security
+# headers too, not only the API.
+[assets]
+directory = "./dist-editor"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cishrt-tracker-prod"
+database_id = "acd4f500-8852-474d-b031-19fc786abc36"
+
+# Every API call counts, right password or wrong, so guessing it is slow.
+[[ratelimits]]
+name = "RL_EDITOR"
+namespace_id = "3400"
+simple = { limit = 30, period = 60 }

@@ -35,6 +35,8 @@
 
 自行部署：先 `npm run wrangler:migrate:cis`，再 `npm run deploy:cis`（见 `wrangler.cis.toml`）。
 
+网站上的每一句话都能改，不用重新部署，七种语言都可以：在单独的文字编辑网站 [cishrt-text.mahiro.uk](https://cishrt-text.mahiro.uk) 里改，网站下次打开就会读到。编辑器用 `npm run deploy:editor` 部署（见 `wrangler.editor.toml`），密码用 `npx wrangler secret put EDITOR_PASSWORD -c wrangler.editor.toml` 设置。
+
 # 目录
 
 - [介绍](#介绍)

@@ -1,5 +1,6 @@
 dist/
 dist-cis/
+dist-editor/
 dev-dist/
 public/
 src-tauri/

@@ -9,6 +9,7 @@ export default defineConfig(
         ignores: [
             '**/dist/',
             '**/dist-cis/',
+            '**/dist-editor/',
             '**/dev-dist/',
             '**/.wrangler/',
             'public/',
@@ -36,7 +37,7 @@ export default defineConfig(
         },
     },
     {
-        files: ['**/*.{js,cjs,mjs}', 'vite.config.ts'],
+        files: ['**/*.{js,cjs,mjs}', 'vite.config.ts', 'vite.editor.config.ts'],
         languageOptions: {
             globals: globals.node,
         },
@@ -48,7 +49,7 @@ export default defineConfig(
         },
     },
     {
-        files: ['src/**/*.{ts,tsx}', 'index.tsx'],
+        files: ['src/**/*.{ts,tsx}', 'editor/**/*.{ts,tsx}', 'index.tsx'],
         extends: [reactHooks.configs.flat.recommended],
         rules: {
             // React Compiler checks. The app does not use the compiler, and

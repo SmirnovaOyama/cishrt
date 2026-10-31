@@ -34,6 +34,7 @@ COPY --from=build /app/workerUtil.ts ./workerUtil.ts
 COPY --from=build /app/shareExpiry.ts ./shareExpiry.ts
 COPY --from=build /app/communityVote.ts ./communityVote.ts
 COPY --from=build /app/communityVoteServer.ts ./communityVoteServer.ts
+COPY --from=build /app/textOverrides.ts ./textOverrides.ts
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/hrt-server ./hrt-server

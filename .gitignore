@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-cis
+dist-editor
 dist-ssr
 *.tsbuildinfo
 src-tauri/target
@@ -48,3 +49,6 @@ test_data_*.json
 playwright-report/
 test-results/
 blob-report/
+
+# The text editor's live password (wrangler secret EDITOR_PASSWORD), kept only on this Mac.
+.editor-password

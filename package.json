@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:cis": "vite --mode cis",
+    "dev:editor": "vite -c vite.editor.config.ts",
     "build": "vite build",
     "build:cis": "vite build --mode cis",
+    "build:editor": "vite build -c vite.editor.config.ts",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
     "test": "vitest run",
@@ -20,6 +22,7 @@
     "wrangler:migrate:reconcile": "node docker/reconcile.mjs hrt-tracker-prod --remote",
     "wrangler:migrate:cis": "wrangler d1 migrations apply cishrt-tracker-prod --remote -c wrangler.cis.toml",
     "deploy:cis": "npm run build:cis && wrangler deploy -c wrangler.cis.toml",
+    "deploy:editor": "npm run build:editor && wrangler deploy -c wrangler.editor.toml",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri": "tauri",

@@ -35,6 +35,8 @@ This repository is the cis edition of Oyama's HRT Tracker, for cis women taking 
 
 To deploy your own: `npm run wrangler:migrate:cis`, then `npm run deploy:cis` (see `wrangler.cis.toml`).
 
+Every word the site shows can be rewritten without a deploy, in any of its seven languages, in a separate text editor at [cishrt-text.mahiro.uk](https://cishrt-text.mahiro.uk). The site reads the edits on its next load. Deploy the editor with `npm run deploy:editor` (see `wrangler.editor.toml`) and set its password with `npx wrangler secret put EDITOR_PASSWORD -c wrangler.editor.toml`.
+
 # Table of Contents
 
 - [Introduction](#introduction)
