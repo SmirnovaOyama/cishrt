@@ -16,11 +16,9 @@
 </p>
 
 <p align="center">
-  <a href="https://hrt.mahiro.uk"><b>在浏览器中打开</b></a>
+  <a href="https://cishrt.mahiro.uk"><b>在浏览器中打开</b></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/xunxunProjects/Oyama-s-HRT-Tracker/releases/latest"><b>macOS 与 Windows 桌面版</b></a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#docker"><b>用 Docker 自行部署</b></a>
+  <a href="#顺性别女性版"><b>自己部署一份</b></a>
 </p>
 
 ## 顺性别女性版

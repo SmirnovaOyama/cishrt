@@ -16,11 +16,9 @@
 </p>
 
 <p align="center">
-  <a href="https://hrt.mahiro.uk"><b>Open in your browser</b></a>
+  <a href="https://cishrt.mahiro.uk"><b>Open in your browser</b></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/xunxunProjects/Oyama-s-HRT-Tracker/releases/latest"><b>macOS and Windows</b></a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#docker"><b>Self-host with Docker</b></a>
+  <a href="#cis-edition"><b>Deploy your own</b></a>
 </p>
 
 ## Cis edition
