@@ -7,6 +7,9 @@ the three production paths, or use the local path for development.
 > deploy `main`; it may contain unreleased changes. `v1.5.2` is a security
 > release: it caps decompressed share snapshots at 20 MiB and disables
 > Wrangler's Local Explorer and local observability APIs in the Docker runtime.
+> The VPS-native unit in [Deployment-VPS](Deployment-VPS) sets the same switches
+> and its proxy example blocks `/cdn-cgi/*`; apply those lines if your unit
+> predates them.
 > It also refreshes the npm and Rust dependency trees. If you need a fix that is
 > only on `main`, wait for the next release rather than deploying an untagged
 > commit.
@@ -90,10 +93,11 @@ session metadata, so protect the database and the host.
    binding and put a proxy in front. Never expose the app port directly to the
    internet; `--mode lan` is only for a trusted network.
 3. **Client address source.** Per-address rate limits need the real client
-   address. Set `TRUSTED_IP_SOURCE` to `cf`, `x-forwarded-for`, or `none` to
-   match what sits in front. A proxy must overwrite `CF-Connecting-IP` or
-   append to `X-Forwarded-For`; otherwise a client can choose its own address
-   or every visitor shares one.
+   address. `TRUSTED_IP_SOURCE` defaults to `none`, which gives one shared
+   bucket per endpoint. Set `cf` only behind Cloudflare, or `x-forwarded-for`
+   only behind exactly one trusted proxy that appends the address. A proxy
+   must overwrite `CF-Connecting-IP` or append to `X-Forwarded-For`; otherwise
+   a client can choose its own address or every visitor shares one.
 4. **`JWT_SECRET`.** Generate a long random value and keep it out of git.
    Changing it signs every session out. The Worker rejects weak or well-known
    values with a 503.

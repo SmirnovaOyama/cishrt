@@ -31,6 +31,9 @@ head_sampling_rate = 1
 
 [vars]
 PUBLIC_APP_ORIGIN = "https://cishrt.mahiro.uk"
+# Cloudflare's edge sets CF-Connecting-IP and a client cannot; without this the
+# Worker trusts no address and every visitor shares one rate limit.
+TRUSTED_IP_SOURCE = "cf"
 
 [[d1_databases]]
 binding = "DB"
