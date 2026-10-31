@@ -3,14 +3,13 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // The page shell speaks for the cis edition too: its link previews describe
-// it, and go without the trans edition's card image, which names
-// hrt.mahiro.uk.
+// it and show its copy of the card image, which names cishrt.mahiro.uk
+// instead of hrt.mahiro.uk (public/og-cis.png, see design/og).
 const cisShell = {
     name: 'cis-shell',
     transformIndexHtml: (html: string) =>
         html
-            .replace(/\s*<meta (?:property|name)="(?:og|twitter):image[^>]*>/g, '')
-            .replace('content="summary_large_image"', 'content="summary"')
+            .replace(/https:\/\/hrt\.mahiro\.uk\/og\.png(?:\?v=\d+)?/g, 'https://cishrt.mahiro.uk/og-cis.png')
             .replace(
                 /Log HRT doses and lab results, estimate hormone levels, and share a read-only record when you choose to\./g,
                 'Log estradiol doses, health checks and blood tests, and estimate your level on top of your own.',

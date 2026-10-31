@@ -18,5 +18,7 @@ To regenerate after an edit:
 npx -p playwright node design/og/render.cjs
 ```
 
-That overwrites `public/og.png`. Run it on a Mac, so the words are set in SF Pro
-like the app; elsewhere another sans stands in.
+That overwrites `public/og.png`, and `public/og-cis.png` with the cis edition's
+copy, which differs only in its address (cishrt.mahiro.uk); the cis build points
+its tags there (`cisShell` in `vite.config.ts`). Run it on a Mac, so the words
+are set in SF Pro like the app; elsewhere another sans stands in.
