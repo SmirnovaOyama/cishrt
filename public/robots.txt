@@ -1,0 +1,7 @@
+# X reads link cards as Twitterbot. Naming it keeps any wider rule, such as the
+# ones Cloudflare may add in front of this file, from shutting the cards out.
+User-agent: Twitterbot
+Allow: /
+
+User-agent: *
+Allow: /
