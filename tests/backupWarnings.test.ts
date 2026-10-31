@@ -35,6 +35,7 @@ const counts = (overrides: Partial<BundleCounts> = {}): BundleCounts => ({
     quickDoses: 0,
     supplies: 0,
     plan: 0,
+    healthChecks: 0,
     ...overrides,
 });
 

@@ -6,7 +6,8 @@
  * and decryption belong to the separate offline Tools workflow.
  *
  * The bundle is deliberately separate from the v2 records export used for cloud
- * sync. It carries the local-only groups (quick doses, supplies, plan),
+ * sync. It carries the local-only groups (quick doses, supplies, plan, and the
+ * cis edition's health checks),
  * calibration state, and an allowlisted set of portable preferences. Import is
  * merge-only: category-level validation runs before any write, and a category
  * with an unresolved same-id conflict is blocked rather than guessed.
@@ -44,6 +45,7 @@ import type { Lang } from '../i18n/translations';
 import { legacyCpaItem, normalizePlanItem, type PlanItem } from './plan';
 import { normalizeSupply, type Pack, type Supply } from './regimen';
 import { cleanDoseMG } from './cleanDose';
+import { sanitizeHealthCheck, type HealthCheck } from './healthCheck';
 import {
     MAX_IMPORT_ENTRIES,
     loadJSONFromStorage,
@@ -105,6 +107,7 @@ export interface CompleteBackupMode {
     quickDoses?: QuickDose[];
     supplies?: Supply[];
     plan?: PlanItem[];
+    healthChecks?: HealthCheck[];
 }
 
 export interface CompleteBackupCalibration {
@@ -136,6 +139,8 @@ export interface CompleteBackupActive {
     quickDoses: QuickDose[];
     supplies: Supply[];
     plan: PlanItem[];
+    /** The cis edition's; left out where the app keeps none, and then read from storage. */
+    healthChecks?: HealthCheck[];
     weight: number;
     pkParams: PKCustomParams | null;
     calibrationMethod: CalibrationMethod;
@@ -159,6 +164,7 @@ export interface BundleCounts {
     quickDoses: number;
     supplies: number;
     plan: number;
+    healthChecks: number;
 }
 
 export type ScalarPreviewAction = 'added' | 'updated' | 'skipped' | 'unchanged' | 'conflict' | 'blocked';
@@ -284,7 +290,15 @@ interface Validation<T> {
     error?: string;
 }
 
-const ARRAY_CATEGORIES = ['events', 'labResults', 'doseTemplates', 'quickDoses', 'supplies', 'plan'] as const;
+const ARRAY_CATEGORIES = [
+    'events',
+    'labResults',
+    'doseTemplates',
+    'quickDoses',
+    'supplies',
+    'plan',
+    'healthChecks',
+] as const;
 type ArrayCategory = (typeof ARRAY_CATEGORIES)[number];
 
 const CATEGORY_SUFFIX: Record<ArrayCategory, string> = {
@@ -294,9 +308,22 @@ const CATEGORY_SUFFIX: Record<ArrayCategory, string> = {
     quickDoses: 'quick-doses',
     supplies: 'supplies',
     plan: 'plan',
+    healthChecks: 'health-checks',
 };
 
 const STAMPED_CATEGORIES: ReadonlySet<ArrayCategory> = new Set(['events', 'labResults', 'doseTemplates']);
+
+// Groups a bundle may leave out and still be complete. A file from before a
+// group existed says nothing about it, so merge and replace both leave the
+// device's own as it is; and a device that never kept one writes none, so a
+// file from the trans edition reads exactly as it did. Health checks, the cis
+// edition's, came after the format.
+const OPTIONAL_CATEGORIES: ReadonlySet<ArrayCategory> = new Set(['healthChecks']);
+
+// Device-only groups whose records carry updatedAt: the same id on both sides
+// merges by the newer edit, as the synced kinds do, though without tombstones,
+// since these never sync.
+const STAMPED_LOCAL_CATEGORIES: ReadonlySet<ArrayCategory> = new Set(['healthChecks']);
 
 const KIND_CATEGORY: Record<RecordKind, ArrayCategory> = {
     events: 'events',
@@ -487,6 +514,27 @@ const validateQuickDose = (raw: unknown, path: string): Validation<QuickDose> =>
     };
 };
 
+const validateHealthCheck = (raw: unknown, path: string, now?: number): Validation<HealthCheck> => {
+    if (!isObject(raw)) return { error: `${path}: record must be an object` };
+    if (!isRecordId(raw.id)) return { error: `${path}: id must be a non-empty string and not a prototype name` };
+    if (!isFiniteNumber(raw.timeH)) return { error: `${path}: timeH must be finite` };
+    const stamp = readStamp(raw.updatedAt, now);
+    if (stamp.error) return { error: `${path}: ${stamp.error}` };
+    // The app's own reader: it drops a hormone or unit it doesn't know, and a
+    // check left with no result at all isn't one.
+    const check = sanitizeHealthCheck(raw);
+    if (!check || Object.keys(check.values).length === 0) return { error: `${path}: no usable result` };
+    const value: HealthCheck = {
+        id: check.id,
+        timeH: check.timeH,
+        phase: check.phase,
+        beforeHrt: check.beforeHrt,
+        values: check.values,
+    };
+    if (stamp.value !== undefined) value.updatedAt = stamp.value;
+    return { value };
+};
+
 /** The production Pack object union. A string pack is never accepted. */
 const validatePack = (raw: unknown, path: string): Validation<Pack> => {
     if (!isObject(raw)) return { error: `${path}: pack must be an object, not a string` };
@@ -577,6 +625,7 @@ const VALIDATORS: Record<ArrayCategory, (raw: unknown, path: string, now?: numbe
     quickDoses: validateQuickDose,
     supplies: validateSupply,
     plan: validatePlan,
+    healthChecks: validateHealthCheck,
 };
 
 const validateArray = <T>(
@@ -986,6 +1035,7 @@ export function buildCompleteBackupBundleReportFromStorage(
         quickDoses: active.quickDoses,
         supplies: active.supplies,
         plan: active.plan,
+        healthChecks: active.healthChecks,
     };
     const envelopeIssues: string[] = [];
     if (!isIsoDate(createdAt)) envelopeIssues.push('createdAt must be an ISO date string');
@@ -1005,7 +1055,16 @@ export function buildCompleteBackupBundleReportFromStorage(
         for (const category of ARRAY_CATEGORIES) {
             const path = `${mode}.${category}`;
             const raw =
-                mode === activeMode ? activeArrays[category] : readInactiveCategory(storage, owner, mode, category);
+                mode === activeMode && activeArrays[category] !== undefined
+                    ? activeArrays[category]
+                    : readInactiveCategory(storage, owner, mode, category);
+            // An optional group this device has never kept stays out of the file.
+            if (
+                OPTIONAL_CATEGORIES.has(category) &&
+                storage.getItem(modeKeyFor(owner, mode, CATEGORY_SUFFIX[category])) === null &&
+                !(Array.isArray(raw) && raw.length > 0)
+            )
+                continue;
             const cleaned = cleanExportRecords(raw, path, VALIDATORS[category], now);
             block[category] = cleaned.values;
             issues.push(...cleaned.issues);
@@ -1172,7 +1231,7 @@ const parseBundle = (raw: unknown, now: number): ParsedBundle => {
         for (const category of ARRAY_CATEGORIES) {
             const path = `${mode}.${category}`;
             if (blockRaw[category] === undefined) {
-                missing.push(path);
+                if (!OPTIONAL_CATEGORIES.has(category)) missing.push(path);
                 continue;
             }
             categoryCounts[path] = Array.isArray(blockRaw[category]) ? blockRaw[category].length : 0;
@@ -1302,13 +1361,15 @@ const zeroCounts = (): BundleCounts => ({
     quickDoses: 0,
     supplies: 0,
     plan: 0,
+    healthChecks: 0,
 });
 
 const countTombstones = (t: Tombstones): number =>
     Object.keys(t.events).length + Object.keys(t.labResults).length + Object.keys(t.doseTemplates).length;
 
 const localArrayFor = (context: CompleteBackupContext, mode: ModeKey, category: ArrayCategory): unknown[] => {
-    if (mode === context.mode) return context.active[category];
+    const active = context.active[category];
+    if (mode === context.mode && active !== undefined) return active;
     const raw = loadJSONFromStorage<unknown>(
         context.storage,
         modeKeyFor(context.owner, mode, CATEGORY_SUFFIX[category]),
@@ -1519,6 +1580,7 @@ const planCategoryMerge = (
     }
 
     const kind = STAMPED_CATEGORIES.has(category) ? (category as RecordKind) : undefined;
+    const stamped = kind !== undefined || STAMPED_LOCAL_CATEGORIES.has(category);
     const removedLocal = new Set(kind ? (deletionPlan?.kinds[kind]?.removedLocalIds ?? []) : []);
     const merged = local.filter(
         record => !(isObject(record) && typeof record.id === 'string' && removedLocal.has(record.id)),
@@ -1577,7 +1639,7 @@ const planCategoryMerge = (
             added++;
             continue;
         }
-        if (!kind) {
+        if (!stamped) {
             return {
                 blocked: `${path}: id ${record.id} already exists and this category has no updatedAt`,
                 conflicts: [],
@@ -2211,7 +2273,7 @@ export function replaceCompleteBackupBundleToStorage(
         for (const category of ARRAY_CATEGORIES) {
             const records = block[category];
             if (records === undefined) {
-                errors.push(`${mode}.${category} is required for replace`);
+                if (!OPTIONAL_CATEGORIES.has(category)) errors.push(`${mode}.${category} is required for replace`);
                 continue;
             }
             const seen = new Set<string>();
@@ -2243,6 +2305,7 @@ export function replaceCompleteBackupBundleToStorage(
         const block = parsed.modes[mode]!;
         const modeResult: CompleteBackupMode = {};
         for (const category of ARRAY_CATEGORIES) {
+            if (block[category] === undefined && OPTIONAL_CATEGORIES.has(category)) continue;
             const records = block[category] ?? [];
             writes.push({
                 key: modeKeyFor(context.owner, mode, CATEGORY_SUFFIX[category]),

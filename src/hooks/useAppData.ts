@@ -265,8 +265,8 @@ export const useAppData = (
     };
     const [plan, setPlan] = useState<PlanItem[]>(() => loadPlan(mode));
     // Health checks (cis edition): kept on the device like the plan, and in
-    // the complete backup with it. Sanitised on every read, since they come
-    // from a hand-pasted report and from backup files alike.
+    // the complete backup with it, but not in cloud sync. Sanitised on every
+    // read, since they come from a hand-pasted report and from backup files alike.
     const loadHealthChecks = (m: 'transfem' | 'transmasc') =>
         sanitizeHealthChecks(loadJSON<unknown>(keyFor(m, 'health-checks'), []));
     const [healthChecks, setHealthChecks] = useState<HealthCheck[]>(() => loadHealthChecks(mode));
@@ -800,6 +800,7 @@ export const useAppData = (
         quickDoses,
         supplies,
         plan,
+        healthChecks,
         weight,
         pkParams,
         calibrationMethod,
@@ -842,6 +843,7 @@ export const useAppData = (
         if (active?.quickDoses !== undefined) setQuickDoses(active.quickDoses);
         if (active?.supplies !== undefined) setSupplies(active.supplies);
         if (active?.plan !== undefined) setPlan(active.plan);
+        if (active?.healthChecks !== undefined) setHealthChecks(active.healthChecks);
         if (result.weight !== undefined) setWeightState(result.weight);
         if (result.pkParams !== undefined) setPkParamsState(result.pkParams);
         if (result.calibration) {
@@ -870,6 +872,7 @@ export const useAppData = (
         if (active?.quickDoses !== undefined) setQuickDoses(active.quickDoses);
         if (active?.supplies !== undefined) setSupplies(active.supplies);
         if (active?.plan !== undefined) setPlan(active.plan);
+        if (active?.healthChecks !== undefined) setHealthChecks(active.healthChecks);
         if (result.weight !== undefined) setWeightState(result.weight);
         if (result.pkParams !== undefined) setPkParamsState(result.pkParams);
         setCalibrationMethodState(result.calibration.method);
