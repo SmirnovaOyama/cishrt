@@ -1,19 +1,22 @@
 version: 2
 
-# Weekly, with minor and patch updates grouped into one pull request per
-# ecosystem. A cooldown holds back versions published in the last few days,
-# so a compromised or broken release has time to be pulled before it lands here.
+# Monthly, with each ecosystem's updates grouped: one pull request for minor
+# and patch versions, one for major versions. A cooldown holds back versions
+# published in the last few days, so a compromised or broken release has time
+# to be pulled before it lands here.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+      npm-major:
+        update-types: [major]
     ignore:
       # Tauri 2 and React 19 are migrations, not bumps; do them by hand.
       - dependency-name: "@tauri-apps/cli"
@@ -27,16 +30,23 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
+      # 6.x lists Babel 8 as an optional peer, which npm won't install next to
+      # the Babel 7 that workbox-build (under vite-plugin-pwa) needs. 5.x
+      # supports vite 8, so stay on it until npm or workbox moves.
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     groups:
       cargo-minor-and-patch:
         update-types: [minor, patch]
+      cargo-major:
+        update-types: [major]
     ignore:
       - dependency-name: tauri
         update-types: ["version-update:semver-major"]
@@ -46,7 +56,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     groups:
@@ -56,6 +66,6 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
